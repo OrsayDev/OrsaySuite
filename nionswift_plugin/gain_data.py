@@ -90,7 +90,7 @@ class HspySignal1D:
         if sum_isig:
             temp_data = temp_data.sum(axis=1)
 
-        return self._get_data(temp_data, 'new_')
+        return self._get_data(temp_data, 'processed_')
 
     def plot_gaussian(self, range):
         m = self.hspy_gd.create_model()
@@ -121,6 +121,9 @@ class HspyGain(HspySignal1D):
 
     def get_gain_profile(self):
         return self.get_11_di(isig=[-2.4, -1.8], sum_isig=True)
+
+    def get_gain_2d(self):
+        return self.get_11_di(isig=[-2.4, -1.8])
 
 
 class gainData:

@@ -297,7 +297,65 @@ class gainhandler:
     def stop_function(self, wiget):
         self.instrument.Laser_stop_all()
 
-    def grab_data_item(self, widget):
+    def align_bin_data_item(self, widget):
+        self.__current_DI = None
+
+        for data_items in self.document_controller.document_model._DocumentModel__data_items:
+            if data_items.title == self.file_name_value.text:
+                self.__current_DI = data_items
+        if self.__current_DI:
+            self.gd = gain_data.HspyGain(self.__current_DI)
+            self.gd.rebin_and_align()
+            self.event_loop.create_task(self.data_item_show(self.gd.get_11_di()))
+        else:
+            logging.info('***PANEL***: Could not find referenced Data Item.')
+
+    def gain_profile_data_item(self, widget):
+        self.__current_DI = None
+
+        for data_items in self.document_controller.document_model._DocumentModel__data_items:
+            if data_items.title == self.file_name_value.text:
+                self.__current_DI = data_items
+
+        if self.__current_DI:
+            self.gd = gain_data.HspyGain(self.__current_DI)
+            self.gd.rebin_and_align()
+            self.event_loop.create_task(self.data_item_show(self.gd.get_gain_profile()))
+        else:
+            logging.info('***PANEL***: Could not find referenced Data Item.')
+
+    def gain_profile_2d_data_item(self, widget):
+        self.__current_DI = None
+
+        for data_items in self.document_controller.document_model._DocumentModel__data_items:
+            if data_items.title == self.file_name_value.text:
+                self.__current_DI = data_items
+
+        if self.__current_DI:
+            self.gd = gain_data.HspyGain(self.__current_DI)
+            self.gd.rebin_and_align()
+            self.event_loop.create_task(self.data_item_show(self.gd.get_gain_2d()))
+        else:
+            logging.info('***PANEL***: Could not find referenced Data Item.')
+
+    def fit_gaussian(self, widget):
+        self.__current_DI = None
+
+        for data_items in self.document_controller.document_model._DocumentModel__data_items:
+            if data_items.title == self.file_name_value.text:
+                self.__current_DI = data_items
+        if self.__current_DI:
+            self.gd = gain_data.HspyGain(self.__current_DI)
+            api_data_item = Facade.DataItem(self.__current_DI)
+            for graphic in api_data_item.graphics:
+                if graphic.graphic_type == 'interval-graphic':
+                    new_di = self.gd.plot_gaussian(graphic.interval)
+                    self.event_loop.create_task(self.data_item_show(new_di))
+        else:
+            logging.info('***PANEL***: Could not find referenced Data Item.')
+
+
+    def test(self, widget):
         self.__current_DI = None
 
         for data_items in self.document_controller.document_model._DocumentModel__data_items:
@@ -330,18 +388,30 @@ class gainView:
 
         ### BEGIN ANALYSIS TAB ##
 
-        self.grab_pb = ui.create_push_button(text='Grab', name='grab_pb', on_clicked='grab_data_item')
-        #self.grab_pb = ui.create_push_button(text='Align and sum ', name='grab_pb', on_clicked='grab_data_item')
-        self.pb_row = ui.create_row(self.grab_pb, ui.create_stretch())
-
         self.file_name_value = ui.create_line_edit(name='file_name_value', width=150)
         self.file_name_row = ui.create_row(self.file_name_value, ui.create_stretch())
 
-        self.pick_group = ui.create_group(title='Pick Tool', content=ui.create_column(
-            self.file_name_row, self.pb_row, ui.create_stretch()))
+        # First group
+        self.align_pb = ui.create_push_button(text='Align and bin', name='align_pb', on_clicked='align_bin_data_item')
+        self.profile_2d_pb = ui.create_push_button(text='2D Gain profile ', name='profile_2d_pb',
+                                                on_clicked='gain_profile_2d_data_item')
+        self.profile_pb = ui.create_push_button(text='Gain profile ', name='profile_pb', on_clicked='gain_profile_data_item')
+        self.pb_row = ui.create_row(self.align_pb, self.profile_2d_pb, self.profile_pb, ui.create_stretch())
 
+        self.d2_group = ui.create_group(title='2D Tools', content=ui.create_column(
+            self.pb_row, ui.create_stretch()))
+
+        #Second group
+        self.fit_gaussian_pb = ui.create_push_button(text='Fit Gaussian', name='fit_gaussian_pb', on_clicked='fit_gaussian')
+        self.pb_row = ui.create_row(self.fit_gaussian_pb, ui.create_stretch())
+
+        self.d1_group = ui.create_group(title='1D Tools', content=ui.create_column(
+            self.pb_row, ui.create_stretch()))
+
+
+        #All groups in one tab
         self.ana_tab = ui.create_tab(label='Gain Data', content=ui.create_column(
-            self.pick_group, ui.create_stretch())
+            self.file_name_row, self.d2_group, self.d1_group, ui.create_stretch())
                                      )
         ## END ANALYSYS TAB
 
@@ -364,6 +434,6 @@ def create_spectro_panel(document_controller, panel_id, properties):
 
 
 def run() -> None:
-    panel_id = "Laser"  # make sure it is unique, otherwise only one of the panel will be displayed
-    name = _("Laser")
+    panel_id = "Orsay Tools"  # make sure it is unique, otherwise only one of the panel will be displayed
+    name = _("Orsay Tools")
     Workspace.WorkspaceManager().register_panel(create_spectro_panel, panel_id, name, ["left", "right"], "left")
