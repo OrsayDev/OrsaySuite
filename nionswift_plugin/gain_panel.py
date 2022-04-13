@@ -277,11 +277,9 @@ class gainhandler:
         if self.__current_DI:
             self.gd = gain_data.HspySignal1D(self.__current_DI.data_item)
             for graphic in self.__current_DI.graphics:
-                print(graphic.type)
                 if graphic.type == 'rect-graphic':  # This is a hyperspectral image
-                    print(dir(graphic))
-                    print(dir(graphic.region))
-                    print(graphic.bounds)
+                    logging.info('***PANEL***: Hyperspectrum selected. If you wish to fit, please select two'
+                                 'data items.')
                 if graphic.type == 'line-profile-graphic': #This is Chrono
                     val = (graphic.start[1], graphic.end[1])
                     new_di = self.gd.plot_gaussian(val)
@@ -292,7 +290,21 @@ class gainhandler:
                     new_di = self.gd.plot_gaussian(graphic.interval)
                     self.event_loop.create_task(self.data_item_show(new_di))
         else:
-            logging.info('***PANEL***: Could not find referenced Data Item.')
+            dis = self._pick_dis() #Multiple data items
+            val_spec = list()
+            if dis and len(dis)==2:
+                spec = dis[1]
+                hspec = dis[0]
+                for graphic in spec.graphics:
+                    if graphic.type == 'interval-graphic':
+                        val_spec = graphic.interval
+                for graphic in hspec.graphics:
+                    if graphic.type == 'rect-graphic' and len(val_spec)==2:
+                        self.gd = gain_data.HspySignal1D(hspec.data_item)
+                        new_di = self.gd.plot_gaussian(val_spec)
+                        self.event_loop.create_task(self.data_item_show(new_di))
+            else:
+                logging.info('***PANEL***: Could not find referenced Data Item.')
 
     def fit_lorentzian(self, widget):
         self.__current_DI = None
@@ -301,8 +313,7 @@ class gainhandler:
 
         if self.__current_DI:
             self.gd = gain_data.HspySignal1D(self.__current_DI.data_item)
-            api_data_item = Facade.DataItem(self.__current_DI)
-            for graphic in api_data_item.graphics:
+            for graphic in self.__current_DI.graphics:
                 if graphic.graphic_type == 'interval-graphic':
                     new_di = self.gd.plot_lorentzian(graphic.interval)
                     self.event_loop.create_task(self.data_item_show(new_di))
@@ -311,15 +322,11 @@ class gainhandler:
 
     def _pick_di(self):
         display_item = self.document_controller.selected_display_item
-        #data_item = display_item.data_items[0] if display_item and len(display_item.data_items) > 0 else None
-        #print(data_item)
-        #print(display_item.data_item)
         return display_item
 
-    def _pick_di_by_name(self):
-        for data_items in self.document_controller.document_model._DocumentModel__data_items:
-            if data_items.title == self.file_name_value.text:
-                self.__current_DI = data_items
+    def _pick_dis(self):
+        display_item = self.document_controller.selected_display_items
+        return display_item
 
 class gainView:
 

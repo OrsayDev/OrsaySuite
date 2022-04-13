@@ -109,12 +109,14 @@ class HspySignal1D:
         m.set_signal_range(r1, r2)
         gaussian = hs.model.components1D.Gaussian()
         gaussian.centre.value = (r1+r2)/2
-        gaussian.A.value = self.hspy_gd.isig[r1:r2].sum(axis=0).data.sum()
+        gaussian.centre.bmin = r1
+        gaussian.centre.bmax = r2
+        gaussian.A.value = numpy.max(self.hspy_gd.isig[r1:r2].data)
         m.append(gaussian)
         m.multifit(bounded=True, show_progressbar=False)
         m[1].print_current_values()
 
-        return self._get_data(m.as_signal().isig[r1:r2], 'gaussian_fit_')
+        return self._get_data(m.as_signal(show_progressbar=False).isig[r1:r2], 'gaussian_fit_')
 
     def plot_lorentzian(self, range):
         r1 = self._rel_to_abs(range[0])
@@ -141,10 +143,6 @@ class HspyGain(HspySignal1D):
         initial = self.hspy_gd.axes_manager[0].offset
         self.hspy_gd = self.hspy_gd.rebin(scale=[self.get_attr('averages'), 1])
         self.hspy_gd.axes_manager[0].offset = initial
-
-    # def rebin_and_align(self):
-    #     self.rebin()
-    #     self.align_zlp()
 
     def get_gain_profile(self):
         return self.get_11_di(isig=[-2.4, -1.8], sum_isig=True)
