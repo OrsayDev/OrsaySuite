@@ -196,113 +196,13 @@ class gainhandler:
     def prepare_free_widget_enable(self,
                                    value):  # THAT THE SECOND EVENT NEVER WORKS. WHAT IS THE DIF BETWEEN THE FIRST?
         self.event_loop.create_task(
-            self.do_enable(True, ['init_pb', 'host_value', 'port_value', 'plot_power_wav', 'align_zlp_max', 'align_zlp_fit', 'smooth_zlp',
-                                  'process_eegs_pb',
-                                  'process_power_pb', 'fit_pb',
-                                  'cancel_pb'
-                                  ]))
-
-    def show_det(self, xdatas, mode, nacq, npic, show):
-
-        for data_items in self.document_controller.document_model._DocumentModel__data_items:
-            if data_items.title == 'Laser Wavelength ' + str(nacq):
-                nacq += 1
-
-        #while self.document_controller.document_model.get_data_item_by_title(
-        #        'Laser Wavelength ' + str(nacq)) is not None:
-        #    nacq += 1  # this puts always a new set even if swift crashes and counts perfectly
-
-        for i, xdata in enumerate(xdatas):
-            data_item = DataItem.DataItem()
-            data_item.set_xdata(xdata)
-            # this nacq-1 is bad. Because Laser Wavelength DI would already be created, this is the easy solution.
-            # so, in order for this to work you need to create laser wavelength before creating my haadf/bf DI
-            if mode == 'init' or mode == 'end': data_item.define_property("title",
-                                                                          mode + '_det' + str(i) + ' ' + str(nacq - 1))
-            # this nacq-1 is bad. Because Laser Wavelength DI would already be created, this is the easy solution.
-            if mode == 'middle': data_item.define_property("title",
-                                                           mode + str(npic) + '_det' + str(i) + ' ' + str(nacq - 1))
-
-            if show: self.event_loop.create_task(self.data_item_show(data_item))
-
-    def call_monitor(self):
-        self.pow02_mon_array = numpy.zeros(200)
-        self.pow02_mon_di = DataItemCreation("Power Fiber", self.pow02_mon_array, 1, [0], [1], ['time (arb. units)'])
-        self.event_loop.create_task(self.data_item_show(self.pow02_mon_di.data_item))
-
-    def append_monitor_data(self, value, index):
-        power02 = value
-        if index==0:
-            self.pow02_mon_array = numpy.zeros(200)
-        self.pow02_mon_array[index] = power02
-        self.pow02_mon_di.fast_update_data_only(self.pow02_mon_array)
-
-    def call_data(self, nacq, pts, avg, start, end, step, cam_acq, **kwargs):
-
-        if len(cam_acq.data.shape) > 1:
-            cam_pixels = cam_acq.data.shape[1]
-            cam_calibration = cam_acq.get_dimensional_calibration(1)
-        else:
-            cam_pixels = cam_acq.data.shape[0]
-            cam_calibration = cam_acq.get_dimensional_calibration(0)
-
-        self.cam_array = numpy.zeros((pts * avg, cam_pixels))
-        self.avg = avg
-        self.pts = pts
-
-        for data_items in self.document_controller.document_model._DocumentModel__data_items:
-            if data_items.title == 'Gain Data ' + str(nacq):
-                nacq += 1
-
-        # Power Meter call
-        self.pow02_array = numpy.zeros(pts * avg)
-        self.pow02_di = DataItemCreation("Power 02 " + str(nacq), self.pow02_array, 1, [0], [1], ['uW'])
-
-        # CAMERA CALL
-        if start == end and step == 0.0:
-            self.cam_di = DataItemCreation('Gain Data ' + str(nacq), self.cam_array, 2,
-                                           [0, cam_calibration.offset], [1 / avg, cam_calibration.scale],
-                                           ['nm', 'eV'], title='Gain Data ' + str(nacq), start_wav=start, end_wav=end,
-                                           pts=pts, averages=avg, **kwargs)
-        else:
-            self.cam_di = DataItemCreation('Gain Data ' + str(nacq), self.cam_array, 2,
-                                           [start, cam_calibration.offset], [step / avg, cam_calibration.scale],
-                                           ['nm', 'eV'], title='Gain Data ' + str(nacq), start_wav=start, end_wav=end,
-                                           pts=pts, averages=avg, **kwargs)
-        self.event_loop.create_task(self.data_item_show(self.cam_di.data_item))
-
-    def append_data(self, value, index1, index2, camera_data, update=True):
-
-        if len(camera_data.data.shape)>1:
-            cam_hor = numpy.sum(camera_data.data, axis=0)
-        else:
-            cam_hor = camera_data.data
-
-        power02 = value
-        self.pow02_array[index2 + index1 * self.avg] = power02
-        self.cam_array[index2 + index1 * self.avg] = cam_hor  # Get raw data
-
-        if update: self.cam_di.update_data_only(self.cam_array)
-
-    def end_data_monitor(self):
-        if self.pow02_mon_di:
-            self.event_loop.create_task(self.data_item_exit_live(self.pow02_mon_di.data_item))
-
-    def end_data(self):
-        if self.pow02_di:
-            self.event_loop.create_task(self.data_item_show(self.pow02_di.data_item))
-            self.event_loop.create_task(self.data_item_exit_live(self.pow02_di.data_item))
-        if self.cam_di: self.event_loop.create_task(self.data_item_exit_live(self.cam_di.data_item))
-
-    def stop_function(self, wiget):
-        self.instrument.Laser_stop_all()
+            self.do_enable(True, ['init_pb']))
 
     def align_bin_data_item(self, widget):
         self.__current_DI = None
 
-        for data_items in self.document_controller.document_model._DocumentModel__data_items:
-            if data_items.title == self.file_name_value.text:
-                self.__current_DI = data_items
+        self.__current_DI = self._pick_di()
+
         if self.__current_DI:
             self.gd = gain_data.HspyGain(self.__current_DI)
             self.gd.rebin_and_align()
@@ -310,12 +210,36 @@ class gainhandler:
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
+    def _align_chrono(self, bin=False, flip=False):
+        self.__current_DI = None
+
+        self.__current_DI = self._pick_di()
+
+        if self.__current_DI:
+            self.gd = gain_data.HspySignal1D(self.__current_DI)
+            if flip: self.gd.flip(axis=1)
+            self.gd.align_zlp()
+            if bin:
+                self.event_loop.create_task(self.data_item_show(self.gd.get_11_di(sum_inav=True)))
+            else:
+                self.event_loop.create_task(self.data_item_show(self.gd.get_11_di()))
+        else:
+            logging.info('***PANEL***: Could not find referenced Data Item.')
+
+    def align_bin_chrono(self, widget):
+        self._align_chrono(bin=True)
+
+    def align_chrono(self, widget):
+        self._align_chrono()
+
+    def align_bin_flip_chrono(self, widget):
+        self._align_chrono(bin=True, flip=True)
+
+
     def gain_profile_data_item(self, widget):
         self.__current_DI = None
 
-        for data_items in self.document_controller.document_model._DocumentModel__data_items:
-            if data_items.title == self.file_name_value.text:
-                self.__current_DI = data_items
+        self.__current_DI = self._pick_di()
 
         if self.__current_DI:
             self.gd = gain_data.HspyGain(self.__current_DI)
@@ -327,9 +251,7 @@ class gainhandler:
     def gain_profile_2d_data_item(self, widget):
         self.__current_DI = None
 
-        for data_items in self.document_controller.document_model._DocumentModel__data_items:
-            if data_items.title == self.file_name_value.text:
-                self.__current_DI = data_items
+        self.__current_DI = self._pick_di()
 
         if self.__current_DI:
             self.gd = gain_data.HspyGain(self.__current_DI)
@@ -341,11 +263,10 @@ class gainhandler:
     def fit_gaussian(self, widget):
         self.__current_DI = None
 
-        for data_items in self.document_controller.document_model._DocumentModel__data_items:
-            if data_items.title == self.file_name_value.text:
-                self.__current_DI = data_items
+        self.__current_DI = self._pick_di()
+
         if self.__current_DI:
-            self.gd = gain_data.HspyGain(self.__current_DI)
+            self.gd = gain_data.HspySignal1D(self.__current_DI)
             api_data_item = Facade.DataItem(self.__current_DI)
             for graphic in api_data_item.graphics:
                 if graphic.graphic_type == 'interval-graphic':
@@ -353,6 +274,31 @@ class gainhandler:
                     self.event_loop.create_task(self.data_item_show(new_di))
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
+
+    def fit_lorentzian(self, widget):
+        self.__current_DI = None
+
+        self.__current_DI = self._pick_di()
+
+        if self.__current_DI:
+            self.gd = gain_data.HspySignal1D(self.__current_DI)
+            api_data_item = Facade.DataItem(self.__current_DI)
+            for graphic in api_data_item.graphics:
+                if graphic.graphic_type == 'interval-graphic':
+                    new_di = self.gd.plot_lorentzian(graphic.interval)
+                    self.event_loop.create_task(self.data_item_show(new_di))
+        else:
+            logging.info('***PANEL***: Could not find referenced Data Item.')
+
+    def _pick_di(self):
+        display_item = self.document_controller.selected_display_item
+        data_item = display_item.data_items[0] if display_item and len(display_item.data_items) > 0 else None
+        return data_item
+
+    def _pick_di_by_name(self):
+        for data_items in self.document_controller.document_model._DocumentModel__data_items:
+            if data_items.title == self.file_name_value.text:
+                self.__current_DI = data_items
 
 
     def test(self, widget):
@@ -386,7 +332,7 @@ class gainView:
     def __init__(self):
         ui = Declarative.DeclarativeUI()
 
-        ### BEGIN ANALYSIS TAB ##
+        ### BEGIN GAIN TAB ##
 
         self.file_name_value = ui.create_line_edit(name='file_name_value', width=150)
         self.file_name_row = ui.create_row(self.file_name_value, ui.create_stretch())
@@ -403,19 +349,41 @@ class gainView:
 
         #Second group
         self.fit_gaussian_pb = ui.create_push_button(text='Fit Gaussian', name='fit_gaussian_pb', on_clicked='fit_gaussian')
-        self.pb_row = ui.create_row(self.fit_gaussian_pb, ui.create_stretch())
+        self.fit_lorentzian_pb = ui.create_push_button(text='Fit Lorentzian', name='fit_lorentzian_pb',
+                                                     on_clicked='fit_lorentzian')
+        self.pb_row = ui.create_row(self.fit_gaussian_pb, self.fit_lorentzian_pb, ui.create_stretch())
 
-        self.d1_group = ui.create_group(title='1D Tools', content=ui.create_column(
+        self.d1_fitting_group = ui.create_group(title='1D fitting Tools', content=ui.create_column(
             self.pb_row, ui.create_stretch()))
+
+        self.chrono_align_pb = ui.create_push_button(text='Align Chrono', name='chrono_align_pb', on_clicked='align_chrono')
+        self.chrono_align_bin_pb = ui.create_push_button(text='Align and bin Chrono', name='chrono_align_bin_pb',
+                                                     on_clicked='align_bin_chrono')
+        self.chrono_align_bin_flip_pb = ui.create_push_button(text='Align and bin w/ flip Chrono', name='chrono_align_bin_flip_pb',
+                                                         on_clicked='align_bin_flip_chrono')
+        self.pb_row = ui.create_row(self.chrono_align_pb, self.chrono_align_bin_pb, self.chrono_align_bin_flip_pb, ui.create_stretch())
+        self.d1_chrono_group = ui.create_group(title='1D Chrono Tools', content=ui.create_column(
+            self.pb_row, ui.create_stretch()
+        ))
 
 
         #All groups in one tab
-        self.ana_tab = ui.create_tab(label='Gain Data', content=ui.create_column(
-            self.file_name_row, self.d2_group, self.d1_group, ui.create_stretch())
+        self.gain_tab = ui.create_tab(label='Gain Data', content=ui.create_column(
+            self.d2_group, self.d1_fitting_group, ui.create_stretch())
                                      )
-        ## END ANALYSYS TAB
+        ### BEGIN SPECTRA TAB ##
+        self.spec_tab = ui.create_tab(label='Spectrum/Chrono', content=ui.create_column(
+            self.d1_fitting_group, self.d1_chrono_group, ui.create_stretch())
+                                     )
 
-        self.tabs = ui.create_tabs(self.ana_tab)
+        ### BEGIN SPIM TAB ##
+        self.hspec_tab = ui.create_tab(label='Hyperspectral Image', content=ui.create_column(
+            self.d1_fitting_group, ui.create_stretch())
+                                      )
+
+        ### CREATING ALL
+
+        self.tabs = ui.create_tabs(self.spec_tab, self.hspec_tab, self.gain_tab)
         self.ui_view = ui.create_column(self.tabs)
 
 def create_spectro_panel(document_controller, panel_id, properties):
