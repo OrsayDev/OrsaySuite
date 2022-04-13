@@ -198,27 +198,27 @@ class gainhandler:
         self.event_loop.create_task(
             self.do_enable(True, ['init_pb']))
 
-    def align_bin_data_item(self, widget):
+    def bin_laser(self, widget):
         self.__current_DI = None
 
         self.__current_DI = self._pick_di()
 
         if self.__current_DI:
-            self.gd = gain_data.HspyGain(self.__current_DI)
-            self.gd.rebin_and_align()
+            self.gd = gain_data.HspyGain(self.__current_DI.data_item)
+            self.gd.rebin()
             self.event_loop.create_task(self.data_item_show(self.gd.get_11_di()))
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
-    def _align_chrono(self, bin=False, flip=False):
+    def _align_chrono(self, align=True, bin=False, flip=False):
         self.__current_DI = None
 
         self.__current_DI = self._pick_di()
 
         if self.__current_DI:
-            self.gd = gain_data.HspySignal1D(self.__current_DI)
+            self.gd = gain_data.HspySignal1D(self.__current_DI.data_item)
             if flip: self.gd.flip(axis=1)
-            self.gd.align_zlp()
+            if align: self.gd.align_zlp()
             if bin:
                 self.event_loop.create_task(self.data_item_show(self.gd.get_11_di(sum_inav=True)))
             else:
@@ -226,15 +226,26 @@ class gainhandler:
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
-    def align_bin_chrono(self, widget):
-        self._align_chrono(bin=True)
-
-    def align_chrono(self, widget):
+    def align_zlp(self, widget):
         self._align_chrono()
 
-    def align_bin_flip_chrono(self, widget):
-        self._align_chrono(bin=True, flip=True)
+    def align_bin_chrono(self, widget):
+        self._align_chrono(align=False, bin=True)
 
+    def align_bin_flip_chrono(self, widget):
+        self._align_chrono(align=False, bin=True, flip=True)
+
+    def interpolate(self, widget):
+        self.__current_DI = None
+
+        self.__current_DI = self._pick_di()
+
+        if self.__current_DI:
+            self.gd = gain_data.HspySignal1D(self.__current_DI.data_item)
+            self.gd.interpolate()
+            self.event_loop.create_task(self.data_item_show(self.gd.get_11_di()))
+        else:
+            logging.info('***PANEL***: Could not find referenced Data Item.')
 
     def gain_profile_data_item(self, widget):
         self.__current_DI = None
@@ -242,8 +253,7 @@ class gainhandler:
         self.__current_DI = self._pick_di()
 
         if self.__current_DI:
-            self.gd = gain_data.HspyGain(self.__current_DI)
-            self.gd.rebin_and_align()
+            self.gd = gain_data.HspyGain(self.__current_DI.data_item)
             self.event_loop.create_task(self.data_item_show(self.gd.get_gain_profile()))
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
@@ -254,8 +264,7 @@ class gainhandler:
         self.__current_DI = self._pick_di()
 
         if self.__current_DI:
-            self.gd = gain_data.HspyGain(self.__current_DI)
-            self.gd.rebin_and_align()
+            self.gd = gain_data.HspyGain(self.__current_DI.data_item)
             self.event_loop.create_task(self.data_item_show(self.gd.get_gain_2d()))
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
@@ -266,10 +275,20 @@ class gainhandler:
         self.__current_DI = self._pick_di()
 
         if self.__current_DI:
-            self.gd = gain_data.HspySignal1D(self.__current_DI)
-            api_data_item = Facade.DataItem(self.__current_DI)
-            for graphic in api_data_item.graphics:
-                if graphic.graphic_type == 'interval-graphic':
+            self.gd = gain_data.HspySignal1D(self.__current_DI.data_item)
+            for graphic in self.__current_DI.graphics:
+                print(graphic.type)
+                if graphic.type == 'rect-graphic':  # This is a hyperspectral image
+                    print(dir(graphic))
+                    print(dir(graphic.region))
+                    print(graphic.bounds)
+                if graphic.type == 'line-profile-graphic': #This is Chrono
+                    val = (graphic.start[1], graphic.end[1])
+                    new_di = self.gd.plot_gaussian(val)
+                    self.event_loop.create_task(self.data_item_show(new_di))
+                    return
+                if graphic.type == 'interval-graphic': #This is 1D
+                    val = graphic.interval
                     new_di = self.gd.plot_gaussian(graphic.interval)
                     self.event_loop.create_task(self.data_item_show(new_di))
         else:
@@ -281,7 +300,7 @@ class gainhandler:
         self.__current_DI = self._pick_di()
 
         if self.__current_DI:
-            self.gd = gain_data.HspySignal1D(self.__current_DI)
+            self.gd = gain_data.HspySignal1D(self.__current_DI.data_item)
             api_data_item = Facade.DataItem(self.__current_DI)
             for graphic in api_data_item.graphics:
                 if graphic.graphic_type == 'interval-graphic':
@@ -292,99 +311,57 @@ class gainhandler:
 
     def _pick_di(self):
         display_item = self.document_controller.selected_display_item
-        data_item = display_item.data_items[0] if display_item and len(display_item.data_items) > 0 else None
-        return data_item
+        #data_item = display_item.data_items[0] if display_item and len(display_item.data_items) > 0 else None
+        #print(data_item)
+        #print(display_item.data_item)
+        return display_item
 
     def _pick_di_by_name(self):
         for data_items in self.document_controller.document_model._DocumentModel__data_items:
             if data_items.title == self.file_name_value.text:
                 self.__current_DI = data_items
 
-
-    def test(self, widget):
-        self.__current_DI = None
-
-        for data_items in self.document_controller.document_model._DocumentModel__data_items:
-            if data_items.title == self.file_name_value.text:
-                self.__current_DI = data_items
-        if self.__current_DI:
-            self.gd = gain_data.HspyGain(self.__current_DI)
-            api_data_item = Facade.DataItem(self.__current_DI)
-            for graphic in api_data_item.graphics:
-                if graphic.graphic_type == 'interval-graphic':
-                    new_di = self.gd.plot_gaussian(graphic.interval)
-                    self.event_loop.create_task(self.data_item_show(new_di))
-
-
-
-
-            #new_di = self.gd.plot_gaussian([575.0, 580.0])
-            #self.gd.rebin_and_align()
-            #new_di = DataItemCreation('Aligned_and_summed_'+self.gd.get_attr('title'), self.gd.get_data(), 2, self.gd.get_axes_offset_all(), self.gd.get_axes_scale_all(), self.gd.get_axes_units_all())
-            #self.event_loop.create_task(self.data_item_show(new_di))
-            #self.event_loop.create_task(self.data_item_show(self.gd.get_gain_profile()))
-        else:
-            logging.info('***PANEL***: Could not find referenced Data Item.')
-
-
 class gainView:
 
     def __init__(self):
         ui = Declarative.DeclarativeUI()
 
-        ### BEGIN GAIN TAB ##
-
-        self.file_name_value = ui.create_line_edit(name='file_name_value', width=150)
-        self.file_name_row = ui.create_row(self.file_name_value, ui.create_stretch())
-
-        # First group
-        self.align_pb = ui.create_push_button(text='Align and bin', name='align_pb', on_clicked='align_bin_data_item')
+        #Gain group
+        self.bin_laser_pb = ui.create_push_button(text='Bin laser', name='bin_laser_pb', on_clicked='bin_laser')
         self.profile_2d_pb = ui.create_push_button(text='2D Gain profile ', name='profile_2d_pb',
                                                 on_clicked='gain_profile_2d_data_item')
         self.profile_pb = ui.create_push_button(text='Gain profile ', name='profile_pb', on_clicked='gain_profile_data_item')
-        self.pb_row = ui.create_row(self.align_pb, self.profile_2d_pb, self.profile_pb, ui.create_stretch())
+        self.pb_row = ui.create_row(self.bin_laser_pb, self.profile_2d_pb, self.profile_pb, ui.create_stretch())
 
         self.d2_group = ui.create_group(title='2D Tools', content=ui.create_column(
             self.pb_row, ui.create_stretch()))
 
-        #Second group
+        #General Group
         self.fit_gaussian_pb = ui.create_push_button(text='Fit Gaussian', name='fit_gaussian_pb', on_clicked='fit_gaussian')
         self.fit_lorentzian_pb = ui.create_push_button(text='Fit Lorentzian', name='fit_lorentzian_pb',
                                                      on_clicked='fit_lorentzian')
-        self.pb_row = ui.create_row(self.fit_gaussian_pb, self.fit_lorentzian_pb, ui.create_stretch())
+        self.interpolate_pb = ui.create_push_button(text='Interpolate', name='interpolate_pb', on_clicked='interpolate')
+        self.align_zlp_pb = ui.create_push_button(text='Align ZLP', name='align_zlp_pb', on_clicked='align_zlp')
 
-        self.d1_fitting_group = ui.create_group(title='1D fitting Tools', content=ui.create_column(
+        self.pb_row = ui.create_row(self.align_zlp_pb, self.interpolate_pb,
+                                    self.fit_gaussian_pb, self.fit_lorentzian_pb,
+                                    ui.create_stretch())
+        self.general_group = ui.create_group(title='General Tools', content=ui.create_column(
             self.pb_row, ui.create_stretch()))
 
-        self.chrono_align_pb = ui.create_push_button(text='Align Chrono', name='chrono_align_pb', on_clicked='align_chrono')
-        self.chrono_align_bin_pb = ui.create_push_button(text='Align and bin Chrono', name='chrono_align_bin_pb',
+        #Chrono Group
+        self.chrono_align_bin_pb = ui.create_push_button(text='Bin Chrono', name='chrono_align_bin_pb',
                                                      on_clicked='align_bin_chrono')
-        self.chrono_align_bin_flip_pb = ui.create_push_button(text='Align and bin w/ flip Chrono', name='chrono_align_bin_flip_pb',
+        self.chrono_align_bin_flip_pb = ui.create_push_button(text='Bin w/ flip Chrono', name='chrono_align_bin_flip_pb',
                                                          on_clicked='align_bin_flip_chrono')
-        self.pb_row = ui.create_row(self.chrono_align_pb, self.chrono_align_bin_pb, self.chrono_align_bin_flip_pb, ui.create_stretch())
+
+        self.pb_row = ui.create_row(self.chrono_align_bin_pb, self.chrono_align_bin_flip_pb, ui.create_stretch())
         self.d1_chrono_group = ui.create_group(title='1D Chrono Tools', content=ui.create_column(
             self.pb_row, ui.create_stretch()
         ))
 
 
-        #All groups in one tab
-        self.gain_tab = ui.create_tab(label='Gain Data', content=ui.create_column(
-            self.d2_group, self.d1_fitting_group, ui.create_stretch())
-                                     )
-        ### BEGIN SPECTRA TAB ##
-        self.spec_tab = ui.create_tab(label='Spectrum/Chrono', content=ui.create_column(
-            self.d1_fitting_group, self.d1_chrono_group, ui.create_stretch())
-                                     )
-
-        ### BEGIN SPIM TAB ##
-        self.hspec_tab = ui.create_tab(label='Hyperspectral Image', content=ui.create_column(
-            self.d1_fitting_group, ui.create_stretch())
-                                      )
-
-        ### CREATING ALL
-
-        self.tabs = ui.create_tabs(self.spec_tab, self.hspec_tab, self.gain_tab)
-        self.ui_view = ui.create_column(self.tabs)
+        self.ui_view = ui.create_column(self.general_group, self.d1_chrono_group, self.d2_group)
 
 def create_spectro_panel(document_controller, panel_id, properties):
     ui_handler = gainhandler(document_controller)

@@ -32,6 +32,11 @@ class HspySignal1D:
     def flip(self, axis):
         self.hspy_gd.data = numpy.flip(self.hspy_gd.data, axis=axis)
 
+    def interpolate(self):
+        self.hspy_gd.interpolate_in_between(256 - 1, 256 + 1, show_progressbar=False)
+        self.hspy_gd.interpolate_in_between(256*2 - 1, 256*2 + 1, show_progressbar=False)
+        self.hspy_gd.interpolate_in_between(256*3 - 1, 256*3 + 1, show_progressbar=False)
+
     def rebin(self, scale):
         self.hspy_gd = self.hspy_gd.rebin(scale=scale)
 
@@ -104,9 +109,9 @@ class HspySignal1D:
         m.set_signal_range(r1, r2)
         gaussian = hs.model.components1D.Gaussian()
         gaussian.centre.value = (r1+r2)/2
-        gaussian.A.value = self.hspy_gd.isig[r1:r2].sum(axis=0).data
+        gaussian.A.value = self.hspy_gd.isig[r1:r2].sum(axis=0).data.sum()
         m.append(gaussian)
-        m.fit(bounded=True)
+        m.multifit(bounded=True, show_progressbar=False)
         m[1].print_current_values()
 
         return self._get_data(m.as_signal().isig[r1:r2], 'gaussian_fit_')
@@ -120,7 +125,7 @@ class HspySignal1D:
         gaussian = hs.model.components1D.Lorentzian()
         gaussian.centre.value = (r1+r2)/2
         m.append(gaussian)
-        m.fit(bounded=True)
+        m.multifit(bounded=True, show_progressbar=False)
         m[1].print_current_values()
 
         return self._get_data(m.as_signal().isig[r1:r2], 'lorentzian_fit_')
@@ -137,9 +142,9 @@ class HspyGain(HspySignal1D):
         self.hspy_gd = self.hspy_gd.rebin(scale=[self.get_attr('averages'), 1])
         self.hspy_gd.axes_manager[0].offset = initial
 
-    def rebin_and_align(self):
-        self.rebin()
-        self.align_zlp()
+    # def rebin_and_align(self):
+    #     self.rebin()
+    #     self.align_zlp()
 
     def get_gain_profile(self):
         return self.get_11_di(isig=[-2.4, -1.8], sum_isig=True)
