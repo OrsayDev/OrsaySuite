@@ -170,10 +170,29 @@ class handler:
     def deconvolve_hspec(self, widget):
         pass
 
-    def _fit_curve(self, which='gaussian'):
+
+    def _general_actions(self, type, which):
         self.__current_DI = None
 
         self.__current_DI = self._pick_di()
+
+        def fitting_action(hspy_signal, val):
+            if which == 'gaussian':
+                new_di = hspy_signal.plot_gaussian(val)
+            elif which == 'lorentzian':
+                new_di = hspy_signal.plot_lorentzian(val)
+            self.event_loop.create_task(self.data_item_show(new_di))
+
+        def remove_background_action(hspy_signal, val):
+            hspy_signal.remove_background(val, which)
+            self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
+
+        if type == 'fitting':
+            action = fitting_action
+        elif type == 'remove_background':
+            action = remove_background_action
+        else:
+            raise Exception("***PANEL***: No action function was selected. Please check the correct type.")
 
         if self.__current_DI:
             self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
@@ -181,46 +200,40 @@ class handler:
                 if graphic.type == 'rect-graphic':  # This is a hyperspectral image
                     logging.info('***PANEL***: Hyperspectrum selected. If you wish to fit, please select two'
                                  'data items.')
-                if graphic.type == 'line-profile-graphic': #This is Chrono
+                if graphic.type == 'line-profile-graphic':  # This is Chrono
                     val = (graphic.start[1], graphic.end[1])
-                    if which == 'gaussian':
-                        new_di = self.gd.plot_gaussian(val)
-                    elif which == 'lorentzian':
-                        new_di = self.gd.plot_lorentzian(val)
-                    self.event_loop.create_task(self.data_item_show(new_di))
+                    action(self.gd, val)
                     return
-                if graphic.type == 'interval-graphic': #This is 1D
+                if graphic.type == 'interval-graphic':  # This is 1D
                     val = graphic.interval
-                    if which == 'gaussian':
-                        new_di = self.gd.plot_gaussian(val)
-                    elif which == 'lorentzian':
-                        new_di = self.gd.plot_lorentzian(val)
-                    self.event_loop.create_task(self.data_item_show(new_di))
+                    action(self.gd, val)
         else:
-            dis = self._pick_dis() #Multiple data items
+            dis = self._pick_dis()  # Multiple data items
             val_spec = list()
-            if dis and len(dis)==2:
+            if dis and len(dis) == 2:
                 spec = dis[1]
                 hspec = dis[0]
                 for graphic in spec.graphics:
                     if graphic.type == 'interval-graphic':
                         val_spec = graphic.interval
                 for graphic in hspec.graphics:
-                    if graphic.type == 'rect-graphic' and len(val_spec)==2:
+                    if graphic.type == 'rect-graphic' and len(val_spec) == 2:
                         self.gd = orsay_data.HspySignal1D(hspec.data_item)
-                        if which == 'gaussian':
-                            new_di = self.gd.plot_gaussian(val)
-                        elif which == 'lorentzian':
-                            new_di = self.gd.plot_lorentzian(val)
-                        self.event_loop.create_task(self.data_item_show(new_di))
+                        action(self.gd, val_spec)
             else:
                 logging.info('***PANEL***: Could not find referenced Data Item.')
 
+    def remove_background_pl(self, widget):
+        self._general_actions('remove_background', 'Power law')
+
+    def remove_background_off(self, widget):
+        self._general_actions('remove_background', 'Offset')
+
     def fit_gaussian(self, widget):
-        self._fit_curve('gaussian')
+        self._general_actions('fitting', 'gaussian')
 
     def fit_lorentzian(self, widget):
-        self._fit_curve('lorentzian')
+        self._general_actions('fitting', 'lorentzian')
 
     def _pick_di(self):
         display_item = self.document_controller.selected_display_item
@@ -253,13 +266,17 @@ class View:
                                               on_clicked='correct_gain')
         self.interpolate_pb = ui.create_push_button(text='Interpolate', name='interpolate_pb', on_clicked='interpolate')
         self.align_zlp_pb = ui.create_push_button(text='Align ZLP', name='align_zlp_pb', on_clicked='align_zlp')
+        self.remove_pl_pb = ui.create_push_button(text='Remove PL', name='remove_pl_pb', on_clicked='remove_background_pl')
+        self.remove_pl_offset = ui.create_push_button(text='Remove OFF', name='remove_off_pb',
+                                                  on_clicked='remove_background_off')
 
-        self.pb_row = ui.create_row(self.interpolate_pb, self.align_zlp_pb, self.cgain_pb,
-                                    ui.create_stretch())
+        self.pb_row = ui.create_row(self.interpolate_pb, self.align_zlp_pb, self.cgain_pb)
+        self.pb_remove = ui.create_row(self.remove_pl_pb, self.remove_pl_offset, ui.create_stretch())
         self.pb_row_fitting = ui.create_row(self.fit_gaussian_pb, self.fit_lorentzian_pb,
                                             ui.create_stretch())
+
         self.general_group = ui.create_group(title='General Tools', content=ui.create_column(
-            self.pb_row, self.pb_row_fitting, ui.create_stretch()))
+            self.pb_row, self.pb_remove, self.pb_row_fitting, ui.create_stretch()))
 
         #Chrono Group
         self.chrono_align_bin_pb = ui.create_push_button(text='Bin Chrono', name='chrono_align_bin_pb',

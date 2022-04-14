@@ -80,7 +80,7 @@ class HspySignal1D:
         data_item.description = self.di.description
         data_item.caption = self.di.caption
 
-        #logging.info(f'***HSPY***: The axes of the returned data is {temp_data.axes_manager}.')
+        logging.info(f'***HSPY***: The axes of the returned data is {temp_data.axes_manager}.')
 
         return data_item
 
@@ -104,6 +104,11 @@ class HspySignal1D:
             temp_data = temp_data.sum(axis=1)
 
         return self._get_data(temp_data, 'processed_')
+
+    def remove_background(self, range, which):
+        r1 = self._rel_to_abs(range[0])
+        r2 = self._rel_to_abs(range[1])
+        self.hspy_gd = self.hspy_gd.remove_background(signal_range=(r1, r2), background_type=which)
 
     def plot_gaussian(self, range):
         r1 = self._rel_to_abs(range[0])
