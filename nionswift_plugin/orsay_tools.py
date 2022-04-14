@@ -173,8 +173,27 @@ class handler:
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
-    def deconvolve_hspec(self, widget):
-        pass
+    def deconvolve_rl_hspec(self, widget):
+        self._deconvolve_hspec('Richardson lucy')
+
+    def _deconvolve_hspec(self, type):
+        self.__current_DI = None
+
+        self.__current_DI = self._pick_di()
+
+        if self.__current_DI:
+            logging.info('***PANEL***: Must select to spectra for deconvolution.')
+        else:
+            dis = self._pick_dis()  # Multiple data items
+            val_spec = list()
+            if dis and len(dis) == 2:
+                self.gd = orsay_data.HspySignal1D(dis[0].data_item)  # hspec
+                self.spec_gd = orsay_data.HspySignal1D(dis[1].data_item) #spec
+                self.gd.deconvolution(self.spec_gd, type)
+                self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
+            else:
+                logging.info('***PANEL***: Could not find referenced Data Item.')
+
 
     def _general_actions(self, type, which):
         self.__current_DI = None
@@ -323,9 +342,9 @@ class View:
 
         #Hyperspectral group
         self.deconvolution_text = ui.create_label(text='Signal deconvolution: ', name='deconvolution_text')
-        self.dec_pb = ui.create_push_button(text='Fourier Log', name='dec_pb',
-                                            on_clicked='deconvolve_hspec')
-        self.pb_row = ui.create_row(self.deconvolution_text, self.dec_pb, ui.create_stretch())
+        self.dec_rl_pb = ui.create_push_button(text='Richardson-Lucy', name='dec_rl_pb',
+                                            on_clicked='deconvolve_rl_hspec')
+        self.pb_row = ui.create_row(self.deconvolution_text, self.dec_rl_pb, ui.create_stretch())
 
         self.binning_text = ui.create_label(text='Bin data (x, y, E): ', name='binning_text')
         self.x_le = ui.create_line_edit(name='x_le', width=15)
