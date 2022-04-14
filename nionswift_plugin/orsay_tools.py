@@ -108,14 +108,23 @@ class handler:
     def correct_gain(self, widget):
         pass
 
-    def _align_chrono(self, align=True, bin=False, flip=False):
+    def flip_signal(self, widget):
         self.__current_DI = None
 
         self.__current_DI = self._pick_di()
 
         if self.__current_DI:
             self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
-            if flip: self.gd.flip(axis=1)
+            self.gd.flip()
+            self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
+
+    def _align_chrono(self, align=True, bin=False):
+        self.__current_DI = None
+
+        self.__current_DI = self._pick_di()
+
+        if self.__current_DI:
+            self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
             if align: self.gd.align_zlp()
             if bin:
                 self.event_loop.create_task(self.data_item_show(self.gd.get_di(sum_inav=True)))
@@ -129,9 +138,6 @@ class handler:
 
     def align_bin_chrono(self, widget):
         self._align_chrono(align=False, bin=True)
-
-    def align_bin_flip_chrono(self, widget):
-        self._align_chrono(align=False, bin=True, flip=True)
 
     def interpolate(self, widget):
         self.__current_DI = None
@@ -169,7 +175,6 @@ class handler:
 
     def deconvolve_hspec(self, widget):
         pass
-
 
     def _general_actions(self, type, which):
         self.__current_DI = None
@@ -235,6 +240,26 @@ class handler:
     def fit_lorentzian(self, widget):
         self._general_actions('fitting', 'lorentzian')
 
+    def hspy_bin(self, widget):
+        try:
+            x = int(self.x_le.text)
+            y = int(self.y_le.text)
+            E = int(self.E_le.text)
+
+            self.__current_DI = None
+
+            self.__current_DI = self._pick_di()
+
+            if self.__current_DI:
+                self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
+                self.gd.rebin(scale=[x, y, E])
+                self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
+            else:
+                logging.info('***PANEL***: Could not find referenced Data Item.')
+
+        except ValueError:
+            logging.info("***PANEL***: Bin values must be integers.")
+
     def _pick_di(self):
         display_item = self.document_controller.selected_display_item
         return display_item
@@ -259,44 +284,58 @@ class View:
             self.pb_row, ui.create_stretch()))
 
         #General Group
-        self.fit_gaussian_pb = ui.create_push_button(text='Fit Gaussian', name='fit_gaussian_pb', on_clicked='fit_gaussian')
-        self.fit_lorentzian_pb = ui.create_push_button(text='Fit Lorentzian', name='fit_lorentzian_pb',
+        self.fit_text = ui.create_label(text='Fitting: ', name='fit_text')
+        self.fit_gaussian_pb = ui.create_push_button(text='Gaussian', name='fit_gaussian_pb', on_clicked='fit_gaussian')
+        self.fit_lorentzian_pb = ui.create_push_button(text='Lorentzian', name='fit_lorentzian_pb',
                                                      on_clicked='fit_lorentzian')
-        self.cgain_pb = ui.create_push_button(text='Correct Gain', name='cgain_pb',
-                                              on_clicked='correct_gain')
+
+        self.simple_text = ui.create_label(text='Simple corrections: ', name='simple_text')
         self.interpolate_pb = ui.create_push_button(text='Interpolate', name='interpolate_pb', on_clicked='interpolate')
         self.align_zlp_pb = ui.create_push_button(text='Align ZLP', name='align_zlp_pb', on_clicked='align_zlp')
-        self.remove_pl_pb = ui.create_push_button(text='Remove PL', name='remove_pl_pb', on_clicked='remove_background_pl')
-        self.remove_pl_offset = ui.create_push_button(text='Remove OFF', name='remove_off_pb',
+        self.cgain_pb = ui.create_push_button(text='Correct Gain', name='cgain_pb',
+                                              on_clicked='correct_gain')
+        self.flip_pb = ui.create_push_button(text='Flip signal', name='flip_pb',
+                                              on_clicked='flip_signal')
+
+        self.background_text = ui.create_label(text='Background Removal: ', name='background_text')
+        self.remove_pl_pb = ui.create_push_button(text='Power Law', name='remove_pl_pb', on_clicked='remove_background_pl')
+        self.remove_pl_offset = ui.create_push_button(text='Offset', name='remove_off_pb',
                                                   on_clicked='remove_background_off')
 
-        self.pb_row = ui.create_row(self.interpolate_pb, self.align_zlp_pb, self.cgain_pb)
-        self.pb_remove = ui.create_row(self.remove_pl_pb, self.remove_pl_offset, ui.create_stretch())
-        self.pb_row_fitting = ui.create_row(self.fit_gaussian_pb, self.fit_lorentzian_pb,
+        self.pb_row = ui.create_row(self.simple_text, self.interpolate_pb, self.align_zlp_pb, self.cgain_pb,
+                                    self.flip_pb, ui.create_stretch())
+        self.pb_remove = ui.create_row(self.background_text, self.remove_pl_pb, self.remove_pl_offset, ui.create_stretch())
+        self.pb_row_fitting = ui.create_row(self.fit_text, self.fit_gaussian_pb, self.fit_lorentzian_pb,
                                             ui.create_stretch())
 
         self.general_group = ui.create_group(title='General Tools', content=ui.create_column(
             self.pb_row, self.pb_remove, self.pb_row_fitting, ui.create_stretch()))
 
         #Chrono Group
-        self.chrono_align_bin_pb = ui.create_push_button(text='Bin Chrono', name='chrono_align_bin_pb',
+        self.transform_text = ui.create_label(text='Transform to spectrum: ', name='transform_text')
+        self.chrono_align_bin_pb = ui.create_push_button(text='Full binning', name='chrono_align_bin_pb',
                                                      on_clicked='align_bin_chrono')
-        self.chrono_align_bin_flip_pb = ui.create_push_button(text='Bin w/ flip Chrono', name='chrono_align_bin_flip_pb',
-                                                         on_clicked='align_bin_flip_chrono')
 
-        self.pb_row = ui.create_row(self.chrono_align_bin_pb, self.chrono_align_bin_flip_pb, ui.create_stretch())
+        self.pb_row = ui.create_row(self.transform_text, self.chrono_align_bin_pb, ui.create_stretch())
         self.d1_chrono_group = ui.create_group(title='1D Chrono Tools', content=ui.create_column(
             self.pb_row, ui.create_stretch()
         ))
 
         #Hyperspectral group
-        self.dec_pb = ui.create_push_button(text='Deconvolution', name='dec_pb',
+        self.deconvolution_text = ui.create_label(text='Signal deconvolution: ', name='deconvolution_text')
+        self.dec_pb = ui.create_push_button(text='Fourier Log', name='dec_pb',
                                             on_clicked='deconvolve_hspec')
-        self.pb_row = ui.create_row(self.dec_pb, ui.create_stretch())
-        self.x_le = ui.create_line_edit(text='1', width=5)
-        self.binning_row = ui.create_row(self.x_le, ui.create_stretch())
+        self.pb_row = ui.create_row(self.deconvolution_text, self.dec_pb, ui.create_stretch())
+
+        self.binning_text = ui.create_label(text='Bin data (x, y, E): ', name='binning_text')
+        self.x_le = ui.create_line_edit(name='x_le', width=15)
+        self.y_le = ui.create_line_edit(name='y_le', width=15)
+        self.E_le = ui.create_line_edit(name='E_le', width=15)
+        self.bin_pb = ui.create_push_button(text='Ok', name='bin_pb', on_clicked='hspy_bin')
+        self.binning_row = ui.create_row(self.binning_text, self.x_le, self.y_le,
+                                         self.E_le, self.bin_pb, ui.create_stretch())
         self.hspec_group = ui.create_group(title='Hyperspectral Image', content=ui.create_column(
-            self.pb_row, ui.create_stretch()
+            self.pb_row, self.binning_row, ui.create_stretch()
         ))
 
         self.last_text = ui.create_label(text='Orsay Tools v0.1.0', name='last_text')

@@ -26,8 +26,9 @@ class HspySignal1D:
 
         #logging.info(f'***HSPY***: The axes of the collected data is {self.hspy_gd.axes_manager}.')
 
-    def flip(self, axis):
-        self.hspy_gd.data = numpy.flip(self.hspy_gd.data, axis=axis)
+    def flip(self):
+        signal_axis = len(self.hspy_gd.data.shape)-1
+        self.hspy_gd.data = numpy.flip(self.hspy_gd.data, axis=signal_axis)
 
     def interpolate(self):
         self.hspy_gd.interpolate_in_between(256 - 1, 256 + 1, show_progressbar=False)
@@ -84,6 +85,8 @@ class HspySignal1D:
 
         return data_item
 
+    def bin_data(self, scale):
+        self.hspy_gd = self.hspy_gd.rebin(scale=scale)
 
     def get_di(self, inav=None, isig=None, sum_inav=None, sum_isig=None):
         temp_data = self.hspy_gd
@@ -122,6 +125,7 @@ class HspySignal1D:
         gaussian.centre.bmax = r2
         gaussian.A.value = numpy.max(self.hspy_gd.isig[r1:r2].data)
         m.append(gaussian)
+        m.assign_current_values_to_all()
         m.multifit(bounded=True, show_progressbar=False)
         m[1].print_current_values()
 
@@ -139,6 +143,7 @@ class HspySignal1D:
         lor.centre.bmax = r2
         lor.A.value = numpy.max(self.hspy_gd.isig[r1:r2].data)
         m.append(lor)
+        m.assign_current_values_to_all()
         m.multifit(bounded=True, show_progressbar=False)
         m[1].print_current_values()
 
