@@ -1,7 +1,4 @@
 import numpy
-from scipy.signal import savgol_filter
-from scipy.interpolate import interp1d
-from scipy.optimize import curve_fit
 from nion.data import Calibration
 from nion.swift.model import DataItem
 from nion.swift.model import Utility
@@ -27,7 +24,7 @@ class HspySignal1D:
             self.hspy_gd.axes_manager[index].scale = di.dimensional_calibrations[index].scale
             self.hspy_gd.axes_manager[index].units = di.dimensional_calibrations[index].units
 
-        logging.info(f'***HSPY***: The axes of the collected data is {self.hspy_gd.axes_manager}.')
+        #logging.info(f'***HSPY***: The axes of the collected data is {self.hspy_gd.axes_manager}.')
 
     def flip(self, axis):
         self.hspy_gd.data = numpy.flip(self.hspy_gd.data, axis=axis)
@@ -83,14 +80,14 @@ class HspySignal1D:
         data_item.description = self.di.description
         data_item.caption = self.di.caption
 
-        logging.info(f'***HSPY***: The axes of the returned data is {temp_data.axes_manager}.')
+        #logging.info(f'***HSPY***: The axes of the returned data is {temp_data.axes_manager}.')
 
         return data_item
 
 
     def get_di(self, inav=None, isig=None, sum_inav=None, sum_isig=None):
         temp_data = self.hspy_gd
-        nav_len = temp_data.data.shape-1
+        nav_len = len(temp_data.data.shape)-1
         if inav is not None:
             assert nav_len == len(inav)
             if nav_len == 0:
@@ -131,9 +128,12 @@ class HspySignal1D:
 
         m = self.hspy_gd.create_model()
         m.set_signal_range(r1, r2)
-        gaussian = hs.model.components1D.Lorentzian()
-        gaussian.centre.value = (r1+r2)/2
-        m.append(gaussian)
+        lor = hs.model.components1D.Lorentzian()
+        lor.centre.value = (r1 + r2) / 2
+        lor.centre.bmin = r1
+        lor.centre.bmax = r2
+        lor.A.value = numpy.max(self.hspy_gd.isig[r1:r2].data)
+        m.append(lor)
         m.multifit(bounded=True, show_progressbar=False)
         m[1].print_current_values()
 
@@ -152,7 +152,7 @@ class HspyGain(HspySignal1D):
         self.hspy_gd.axes_manager[0].offset = initial
 
     def get_gain_profile(self):
-        return self.get_11_di(isig=[-2.4, -1.8], sum_isig=True)
+        return self.get_di(isig=[-2.4, -1.8], sum_isig=True)
 
     def get_gain_2d(self):
-        return self.get_11_di(isig=[-2.4, -1.8])
+        return self.get_di(isig=[-2.4, -1.8])

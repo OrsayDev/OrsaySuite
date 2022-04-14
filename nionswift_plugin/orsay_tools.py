@@ -12,7 +12,7 @@ from nion.swift.model import DataItem
 from nion.swift.model import Utility
 from nion.swift import Facade
 
-from . import gain_data
+from . import orsay_data
 
 import os
 import json
@@ -54,112 +54,7 @@ class DataItemCreation():
                                                            timezone=self.timezone, timezone_offset=self.timezone_offset)
         self.data_item.set_xdata(self.xdata)
 
-class DataItemLaserCreation():
-    def __init__(self, title, array, which, start=None, final=None, pts=None, avg=None, step=None, delay=None,
-                 time_width=None, start_ps_cur=None, ctrl=None, trans=None, is_live=True, cam_dispersion=1.0, cam_offset=0,
-                 power_min=0, power_inc=1, **kwargs):
-        self.acq_parameters = {
-            "title": title,
-            "which": which,
-            "start_wav": start,
-            "final_wav": final,
-            "pts": pts,
-            "averages": avg,
-            "step_wav": step,
-            "delay": delay,
-            "time_width": time_width,
-            "start_ps_cur": start_ps_cur,
-            "control": ctrl,
-            "initial_trans": trans
-        }
-        self.timezone = Utility.get_local_timezone()
-        self.timezone_offset = Utility.TimezoneMinutesToStringConverter().convert(Utility.local_utcoffset_minutes())
-
-        self.calibration = Calibration.Calibration()
-        self.dimensional_calibrations = [Calibration.Calibration()]
-
-        if which == 'WAV':
-            self.calibration.units = 'nm'
-        if which == 'POW':
-            self.calibration.units = 'μW'
-        if which == 'SER':
-            self.calibration.units = '°'
-        if which == 'PS':
-            self.calibration.units = 'A'
-        if which == 'transmission_as_wav':
-            self.calibration.units = 'T'
-            self.dimensional_calibrations[0].units = 'nm'
-            self.dimensional_calibrations[0].offset = start
-            self.dimensional_calibrations[0].scale = step
-        if which == 'power_as_wav':
-            self.calibration.units = 'μW'
-            self.dimensional_calibrations[0].units = 'nm'
-            self.dimensional_calibrations[0].offset = start
-            self.dimensional_calibrations[0].scale = step
-        if which == 'sEEGS/sEELS_power':
-            self.calibration.units = 'A.U.'
-            self.dimensional_calibrations[0].units = 'μW'
-            self.dimensional_calibrations[0].offset = power_min
-            self.dimensional_calibrations[0].scale = power_inc
-        if which == 'sEEGS/sEELS':
-            self.calibration.units = 'A.U.'
-            self.dimensional_calibrations[0].units = 'nm'
-            self.dimensional_calibrations[0].offset = start
-            self.dimensional_calibrations[0].scale = step
-        if which == "CAM_DATA":
-            self.dimensional_calibrations = [Calibration.Calibration(), Calibration.Calibration()]
-            self.dimensional_calibrations[0].units = 'nm'
-            self.dimensional_calibrations[0].offset = start
-            self.dimensional_calibrations[0].scale = (step) / avg
-            self.dimensional_calibrations[1].units = 'eV'
-        if which == "POWER_CAM_DATA":
-            self.dimensional_calibrations = [Calibration.Calibration(), Calibration.Calibration()]
-            self.dimensional_calibrations[0].units = 'μW'
-            self.dimensional_calibrations[0].offset = 0
-            self.dimensional_calibrations[0].scale = 1
-            self.dimensional_calibrations[1].units = 'eV'
-        if which == 'ALIGNED_CAM_DATA':
-            self.dimensional_calibrations = [Calibration.Calibration(), Calibration.Calibration()]
-            self.dimensional_calibrations[0].units = 'nm'
-            self.dimensional_calibrations[0].offset = start
-            self.dimensional_calibrations[0].scale = step
-            self.dimensional_calibrations[1].units = 'eV'
-            self.dimensional_calibrations[1].scale = cam_dispersion
-            self.dimensional_calibrations[1].offset = cam_offset
-
-        self.xdata = DataAndMetadata.new_data_and_metadata(array, self.calibration, self.dimensional_calibrations,
-                                                           metadata=self.acq_parameters,
-                                                           timezone=self.timezone, timezone_offset=self.timezone_offset)
-
-        self.data_item = DataItem.DataItem()
-        self.data_item.set_xdata(self.xdata)
-        #self.data_item.define_property("title", title)
-        self.data_item.title = title
-        self.data_item.description = self.acq_parameters
-        self.data_item.caption = self.acq_parameters
-
-        if is_live: self.data_item._enter_live_state()
-
-    def update_data_only(self, array: numpy.array):
-        self.xdata = DataAndMetadata.new_data_and_metadata(array, self.calibration, self.dimensional_calibrations,
-                                                           metadata = self.acq_parameters,
-                                                           timezone=self.timezone, timezone_offset=self.timezone_offset)
-        self.data_item.set_xdata(self.xdata)
-
-    def fast_update_data_only(self, array: numpy.array):
-        self.data_item.set_data(array)
-
-    def set_cam_di_calibration(self, calib: Calibration.Calibration()):
-        self.dimensional_calibrations[1] = calib
-
-    def set_cam_di_calibratrion_from_di(self, di: DataItem):
-        pass
-
-    def set_dim_calibration(self):
-        self.data_item.dimensional_calibrations = self.dimensional_calibrations
-
-
-class gainhandler:
+class handler:
 
     def __init__(self, document_controller):
 
@@ -204,7 +99,7 @@ class gainhandler:
         self.__current_DI = self._pick_di()
 
         if self.__current_DI:
-            self.gd = gain_data.HspyGain(self.__current_DI.data_item)
+            self.gd = orsay_data.HspyGain(self.__current_DI.data_item)
             self.gd.rebin()
             self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
         else:
@@ -219,7 +114,7 @@ class gainhandler:
         self.__current_DI = self._pick_di()
 
         if self.__current_DI:
-            self.gd = gain_data.HspySignal1D(self.__current_DI.data_item)
+            self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
             if flip: self.gd.flip(axis=1)
             if align: self.gd.align_zlp()
             if bin:
@@ -244,7 +139,7 @@ class gainhandler:
         self.__current_DI = self._pick_di()
 
         if self.__current_DI:
-            self.gd = gain_data.HspySignal1D(self.__current_DI.data_item)
+            self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
             self.gd.interpolate()
             self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
         else:
@@ -256,7 +151,7 @@ class gainhandler:
         self.__current_DI = self._pick_di()
 
         if self.__current_DI:
-            self.gd = gain_data.HspyGain(self.__current_DI.data_item)
+            self.gd = orsay_data.HspyGain(self.__current_DI.data_item)
             self.event_loop.create_task(self.data_item_show(self.gd.get_gain_profile()))
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
@@ -267,7 +162,7 @@ class gainhandler:
         self.__current_DI = self._pick_di()
 
         if self.__current_DI:
-            self.gd = gain_data.HspyGain(self.__current_DI.data_item)
+            self.gd = orsay_data.HspyGain(self.__current_DI.data_item)
             self.event_loop.create_task(self.data_item_show(self.gd.get_gain_2d()))
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
@@ -275,25 +170,31 @@ class gainhandler:
     def deconvolve_hspec(self, widget):
         pass
 
-    def fit_gaussian(self, widget):
+    def _fit_curve(self, which='gaussian'):
         self.__current_DI = None
 
         self.__current_DI = self._pick_di()
 
         if self.__current_DI:
-            self.gd = gain_data.HspySignal1D(self.__current_DI.data_item)
+            self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
             for graphic in self.__current_DI.graphics:
                 if graphic.type == 'rect-graphic':  # This is a hyperspectral image
                     logging.info('***PANEL***: Hyperspectrum selected. If you wish to fit, please select two'
                                  'data items.')
                 if graphic.type == 'line-profile-graphic': #This is Chrono
                     val = (graphic.start[1], graphic.end[1])
-                    new_di = self.gd.plot_gaussian(val)
+                    if which == 'gaussian':
+                        new_di = self.gd.plot_gaussian(val)
+                    elif which == 'lorentzian':
+                        new_di = self.gd.plot_lorentzian(val)
                     self.event_loop.create_task(self.data_item_show(new_di))
                     return
                 if graphic.type == 'interval-graphic': #This is 1D
                     val = graphic.interval
-                    new_di = self.gd.plot_gaussian(graphic.interval)
+                    if which == 'gaussian':
+                        new_di = self.gd.plot_gaussian(val)
+                    elif which == 'lorentzian':
+                        new_di = self.gd.plot_lorentzian(val)
                     self.event_loop.create_task(self.data_item_show(new_di))
         else:
             dis = self._pick_dis() #Multiple data items
@@ -306,25 +207,20 @@ class gainhandler:
                         val_spec = graphic.interval
                 for graphic in hspec.graphics:
                     if graphic.type == 'rect-graphic' and len(val_spec)==2:
-                        self.gd = gain_data.HspySignal1D(hspec.data_item)
-                        new_di = self.gd.plot_gaussian(val_spec)
+                        self.gd = orsay_data.HspySignal1D(hspec.data_item)
+                        if which == 'gaussian':
+                            new_di = self.gd.plot_gaussian(val)
+                        elif which == 'lorentzian':
+                            new_di = self.gd.plot_lorentzian(val)
                         self.event_loop.create_task(self.data_item_show(new_di))
             else:
                 logging.info('***PANEL***: Could not find referenced Data Item.')
 
+    def fit_gaussian(self, widget):
+        self._fit_curve('gaussian')
+
     def fit_lorentzian(self, widget):
-        self.__current_DI = None
-
-        self.__current_DI = self._pick_di()
-
-        if self.__current_DI:
-            self.gd = gain_data.HspySignal1D(self.__current_DI.data_item)
-            for graphic in self.__current_DI.graphics:
-                if graphic.graphic_type == 'interval-graphic':
-                    new_di = self.gd.plot_lorentzian(graphic.interval)
-                    self.event_loop.create_task(self.data_item_show(new_di))
-        else:
-            logging.info('***PANEL***: Could not find referenced Data Item.')
+        self._fit_curve('lorentzian')
 
     def _pick_di(self):
         display_item = self.document_controller.selected_display_item
@@ -334,7 +230,7 @@ class gainhandler:
         display_item = self.document_controller.selected_display_items
         return display_item
 
-class gainView:
+class View:
 
     def __init__(self):
         ui = Declarative.DeclarativeUI()
@@ -386,15 +282,15 @@ class gainView:
             self.pb_row, ui.create_stretch()
         ))
 
-        self.last_text = ui.create_label(text='Orsay Tools v1.0.0', name='last_text')
+        self.last_text = ui.create_label(text='Orsay Tools v0.1.0', name='last_text')
         self.last_row = ui.create_row(ui.create_stretch(), self.last_text)
 
         self.ui_view = ui.create_column(self.general_group, self.d1_chrono_group,
                                         self.hspec_group, self.d2_group, self.last_row)
 
-def create_spectro_panel(document_controller, panel_id, properties):
-    ui_handler = gainhandler(document_controller)
-    ui_view = gainView()
+def create_panel(document_controller, panel_id, properties):
+    ui_handler = handler(document_controller)
+    ui_view = View()
     panel = Panel.Panel(document_controller, panel_id, properties)
 
     finishes = list()
@@ -410,4 +306,4 @@ def create_spectro_panel(document_controller, panel_id, properties):
 def run() -> None:
     panel_id = "Orsay Tools"  # make sure it is unique, otherwise only one of the panel will be displayed
     name = _("Orsay Tools")
-    Workspace.WorkspaceManager().register_panel(create_spectro_panel, panel_id, name, ["left", "right"], "left")
+    Workspace.WorkspaceManager().register_panel(create_panel, panel_id, name, ["left", "right"], "left")
