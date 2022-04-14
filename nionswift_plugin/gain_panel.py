@@ -206,9 +206,12 @@ class gainhandler:
         if self.__current_DI:
             self.gd = gain_data.HspyGain(self.__current_DI.data_item)
             self.gd.rebin()
-            self.event_loop.create_task(self.data_item_show(self.gd.get_11_di()))
+            self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
+
+    def correct_gain(self, widget):
+        pass
 
     def _align_chrono(self, align=True, bin=False, flip=False):
         self.__current_DI = None
@@ -220,9 +223,9 @@ class gainhandler:
             if flip: self.gd.flip(axis=1)
             if align: self.gd.align_zlp()
             if bin:
-                self.event_loop.create_task(self.data_item_show(self.gd.get_11_di(sum_inav=True)))
+                self.event_loop.create_task(self.data_item_show(self.gd.get_di(sum_inav=True)))
             else:
-                self.event_loop.create_task(self.data_item_show(self.gd.get_11_di()))
+                self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
@@ -243,7 +246,7 @@ class gainhandler:
         if self.__current_DI:
             self.gd = gain_data.HspySignal1D(self.__current_DI.data_item)
             self.gd.interpolate()
-            self.event_loop.create_task(self.data_item_show(self.gd.get_11_di()))
+            self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
@@ -268,6 +271,9 @@ class gainhandler:
             self.event_loop.create_task(self.data_item_show(self.gd.get_gain_2d()))
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
+
+    def deconvolve_hspec(self, widget):
+        pass
 
     def fit_gaussian(self, widget):
         self.__current_DI = None
@@ -340,21 +346,24 @@ class gainView:
         self.profile_pb = ui.create_push_button(text='Gain profile ', name='profile_pb', on_clicked='gain_profile_data_item')
         self.pb_row = ui.create_row(self.bin_laser_pb, self.profile_2d_pb, self.profile_pb, ui.create_stretch())
 
-        self.d2_group = ui.create_group(title='2D Tools', content=ui.create_column(
+        self.d2_group = ui.create_group(title='EEGS Tools', content=ui.create_column(
             self.pb_row, ui.create_stretch()))
 
         #General Group
         self.fit_gaussian_pb = ui.create_push_button(text='Fit Gaussian', name='fit_gaussian_pb', on_clicked='fit_gaussian')
         self.fit_lorentzian_pb = ui.create_push_button(text='Fit Lorentzian', name='fit_lorentzian_pb',
                                                      on_clicked='fit_lorentzian')
+        self.cgain_pb = ui.create_push_button(text='Correct Gain', name='cgain_pb',
+                                              on_clicked='correct_gain')
         self.interpolate_pb = ui.create_push_button(text='Interpolate', name='interpolate_pb', on_clicked='interpolate')
         self.align_zlp_pb = ui.create_push_button(text='Align ZLP', name='align_zlp_pb', on_clicked='align_zlp')
 
-        self.pb_row = ui.create_row(self.align_zlp_pb, self.interpolate_pb,
-                                    self.fit_gaussian_pb, self.fit_lorentzian_pb,
+        self.pb_row = ui.create_row(self.interpolate_pb, self.align_zlp_pb, self.cgain_pb,
                                     ui.create_stretch())
+        self.pb_row_fitting = ui.create_row(self.fit_gaussian_pb, self.fit_lorentzian_pb,
+                                            ui.create_stretch())
         self.general_group = ui.create_group(title='General Tools', content=ui.create_column(
-            self.pb_row, ui.create_stretch()))
+            self.pb_row, self.pb_row_fitting, ui.create_stretch()))
 
         #Chrono Group
         self.chrono_align_bin_pb = ui.create_push_button(text='Bin Chrono', name='chrono_align_bin_pb',
@@ -367,8 +376,21 @@ class gainView:
             self.pb_row, ui.create_stretch()
         ))
 
+        #Hyperspectral group
+        self.dec_pb = ui.create_push_button(text='Deconvolution', name='dec_pb',
+                                            on_clicked='deconvolve_hspec')
+        self.pb_row = ui.create_row(self.dec_pb, ui.create_stretch())
+        self.x_le = ui.create_line_edit(text='1', width=5)
+        self.binning_row = ui.create_row(self.x_le, ui.create_stretch())
+        self.hspec_group = ui.create_group(title='Hyperspectral Image', content=ui.create_column(
+            self.pb_row, ui.create_stretch()
+        ))
 
-        self.ui_view = ui.create_column(self.general_group, self.d1_chrono_group, self.d2_group)
+        self.last_text = ui.create_label(text='Orsay Tools v1.0.0', name='last_text')
+        self.last_row = ui.create_row(ui.create_stretch(), self.last_text)
+
+        self.ui_view = ui.create_column(self.general_group, self.d1_chrono_group,
+                                        self.hspec_group, self.d2_group, self.last_row)
 
 def create_spectro_panel(document_controller, panel_id, properties):
     ui_handler = gainhandler(document_controller)

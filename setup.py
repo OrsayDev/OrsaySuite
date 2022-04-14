@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="OrsaySuite",
-    version="0.0.5",
+    version="0.0.6",
     author="Yves Auad",
     description="Tools for analyzing data using Hyperspy",
     url="https://github.com/yvesauad/yvorsay-instrument",

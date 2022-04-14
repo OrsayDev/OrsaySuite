@@ -88,10 +88,17 @@ class HspySignal1D:
         return data_item
 
 
-    def get_11_di(self, inav=None, isig=None, sum_inav=None, sum_isig=None):
+    def get_di(self, inav=None, isig=None, sum_inav=None, sum_isig=None):
         temp_data = self.hspy_gd
+        nav_len = temp_data.data.shape-1
         if inav is not None:
-            temp_data = temp_data.inav[inav[0]: inav[1]]
+            assert nav_len == len(inav)
+            if nav_len == 0:
+                pass
+            elif nav_len == 1:
+                temp_data = temp_data.inav[inav[0]: inav[1]]
+            elif nav_len == 2:
+                temp_data = temp_data.inav[inav[0][0]: inav[0][1], inav[1][0]: inav[1][1]]
         if isig is not None:
             temp_data = temp_data.isig[isig[0]: isig[1]]
         if sum_inav:
