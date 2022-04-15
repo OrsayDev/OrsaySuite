@@ -211,10 +211,18 @@ class handler:
             hspy_signal.remove_background(val, which)
             self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
 
+        def decomposition_action(hspy_signal, val):
+            var, new_di = hspy_signal.signal_decomposition(val, which)
+            self.event_loop.create_task(self.data_item_show(new_di))
+            self.event_loop.create_task(self.data_item_show(var))
+
+
         if type == 'fitting':
             action = fitting_action
         elif type == 'remove_background':
             action = remove_background_action
+        elif type == 'decomposition':
+            action = decomposition_action
         else:
             raise Exception("***PANEL***: No action function was selected. Please check the correct type.")
 
@@ -222,7 +230,7 @@ class handler:
             self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
             for graphic in self.__current_DI.graphics:
                 if graphic.type == 'rect-graphic':  # This is a hyperspectral image
-                    logging.info('***PANEL***: Hyperspectrum selected. If you wish to fit, please select two'
+                    logging.info('***PANEL***: Hyperspectrum selected. If you wish to perform this action, please select two '
                                  'data items.')
                 if graphic.type == 'line-profile-graphic':  # This is Chrono
                     val = (graphic.start[1], graphic.end[1])
@@ -258,6 +266,15 @@ class handler:
 
     def fit_lorentzian(self, widget):
         self._general_actions('fitting', 'lorentzian')
+
+    def pca3(self, widget):
+        self._general_actions('decomposition', 3)
+
+    def pca5(self, widget):
+        self._general_actions('decomposition', 5)
+
+    def pca10(self, widget):
+        self._general_actions('decomposition', 10)
 
     def hspy_bin(self, widget):
         try:
@@ -316,13 +333,17 @@ class View:
         self.flip_pb = ui.create_push_button(text='Flip signal', name='flip_pb',
                                               on_clicked='flip_signal')
 
+
+
         self.background_text = ui.create_label(text='Background Removal: ', name='background_text')
         self.remove_pl_pb = ui.create_push_button(text='Power Law', name='remove_pl_pb', on_clicked='remove_background_pl')
         self.remove_pl_offset = ui.create_push_button(text='Offset', name='remove_off_pb',
                                                   on_clicked='remove_background_off')
 
+
         self.pb_row = ui.create_row(self.simple_text, self.interpolate_pb, self.align_zlp_pb, self.cgain_pb,
                                     self.flip_pb, ui.create_stretch())
+
         self.pb_remove = ui.create_row(self.background_text, self.remove_pl_pb, self.remove_pl_offset, ui.create_stretch())
         self.pb_row_fitting = ui.create_row(self.fit_text, self.fit_gaussian_pb, self.fit_lorentzian_pb,
                                             ui.create_stretch())
@@ -346,6 +367,13 @@ class View:
                                             on_clicked='deconvolve_rl_hspec')
         self.pb_row = ui.create_row(self.deconvolution_text, self.dec_rl_pb, ui.create_stretch())
 
+        self.dec_text = ui.create_label(text='Signal decomposition: ', name='dec_text')
+        self.pca3_pb = ui.create_push_button(text='PCA3', name='pca3_pb', on_clicked='pca3')
+        self.pca5_pb = ui.create_push_button(text='PCA5', name='pca5_pb', on_clicked='pca5')
+        self.pca10_pb = ui.create_push_button(text='PCA10', name='pca10_pb', on_clicked='pca10')
+        self.decomposition_row = ui.create_row(self.dec_text, self.pca3_pb, self.pca5_pb, self.pca10_pb,
+                                               ui.create_stretch())
+
         self.binning_text = ui.create_label(text='Bin data (x, y, E): ', name='binning_text')
         self.x_le = ui.create_line_edit(name='x_le', width=15)
         self.y_le = ui.create_line_edit(name='y_le', width=15)
@@ -353,8 +381,9 @@ class View:
         self.bin_pb = ui.create_push_button(text='Ok', name='bin_pb', on_clicked='hspy_bin')
         self.binning_row = ui.create_row(self.binning_text, self.x_le, self.y_le,
                                          self.E_le, self.bin_pb, ui.create_stretch())
+
         self.hspec_group = ui.create_group(title='Hyperspectral Image', content=ui.create_column(
-            self.pb_row, self.binning_row, ui.create_stretch()
+            self.binning_row, self.pb_row, self.decomposition_row, ui.create_stretch()
         ))
 
         self.last_text = ui.create_label(text='Orsay Tools v0.1.0', name='last_text')

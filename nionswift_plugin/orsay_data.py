@@ -149,6 +149,19 @@ class HspySignal1D:
 
         return self._get_data(m.as_signal().isig[r1:r2], 'lorentzian_fit_')
 
+    def signal_decomposition(self, range, components=3):
+        r1 = self._rel_to_abs(range[0])
+        r2 = self._rel_to_abs(range[1])
+
+        signal_mask2 = self.hspy_gd._get_signal_signal(dtype='bool')
+        signal_mask2.isig[r1: r2] = True
+        self.hspy_gd.decomposition(True, svd_solver='full', signal_mask=signal_mask2)
+
+        variance = self.hspy_gd.get_explained_variance_ratio()
+        spim_dec = self.hspy_gd.get_decomposition_model(components)
+
+        return [self._get_data(variance, 'PCAvar'+str(components)+'_'), self._get_data(spim_dec, 'PCA'+str(components)+'_')]
+
     def _rel_to_abs(self, val):
         return self.signal_calib.offset + val*self.signal_calib.scale*self.signal_size
 
