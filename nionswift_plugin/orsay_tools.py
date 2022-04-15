@@ -64,6 +64,11 @@ class handler:
 
     def init_handler(self):
         self.event_loop.create_task(self.do_enable(True, ['']))
+        self.x_le.text = '1'
+        self.y_le.text = '1'
+        self.E_le.text = '1'
+        self.comp_le.text = '3'
+        self.int_le.text = '10'
 
 
     async def data_item_show(self, DI):
@@ -282,6 +287,23 @@ class handler:
         except ValueError:
             logging.info("***PANEL***: Interaction value must be integer.")
 
+    def pca_full(self, widget):
+        self._pca_full()
+
+    def _pca_full(self):
+        try:
+            val = int(self.comp_le.text)
+            self.__current_DI = self._pick_di()
+            if self.__current_DI:
+                self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)  # hspec
+                var, new_di = self.gd.signal_decomposition(components=val, mask=False)
+                self.event_loop.create_task(self.data_item_show(new_di))
+                self.event_loop.create_task(self.data_item_show(var))
+            else:
+                logging.info('***PANEL***: Could not find referenced Data Item.')
+        except ValueError:
+            logging.info("***PANEL***: Components value must be integer.")
+
     def hspy_bin(self, widget):
         try:
             x = int(self.x_le.text)
@@ -342,33 +364,29 @@ class View:
         self.flip_pb = ui.create_push_button(text='Flip signal', name='flip_pb',
                                               on_clicked='flip_signal')
 
-
-
         self.background_text = ui.create_label(text='Background Removal: ', name='background_text')
         self.remove_pl_pb = ui.create_push_button(text='Power Law', name='remove_pl_pb', on_clicked='remove_background_pl')
         self.remove_pl_offset = ui.create_push_button(text='Offset', name='remove_off_pb',
                                                   on_clicked='remove_background_off')
 
+        self.binning_text = ui.create_label(text='Bin data (x, y, E): (', name='binning_text')
+        self.x_le = ui.create_line_edit(name='x_le', width=25)
+        self.y_le = ui.create_line_edit(name='y_le', width=25)
+        self.E_le = ui.create_line_edit(name='E_le', width=25)
+        self.bin_pb = ui.create_push_button(text='Bin', name='bin_pb', on_clicked='hspy_bin')
 
         self.pb_row = ui.create_row(self.simple_text, self.interpolate_pb, self.align_zlp_pb, self.cgain_pb,
                                     self.flip_pb, ui.create_stretch())
-
         self.pb_remove = ui.create_row(self.background_text, self.remove_pl_pb, self.remove_pl_offset, ui.create_stretch())
         self.pb_row_fitting = ui.create_row(self.fit_text, self.fit_gaussian_pb, self.fit_lorentzian_pb,
                                             ui.create_stretch())
+        self.binning_row = ui.create_row(self.binning_text, self.x_le, self.y_le,
+                                         self.E_le, self.close_par, ui.create_spacing(5), self.bin_pb,
+                                         ui.create_stretch())
 
         self.general_group = ui.create_group(title='General Tools', content=ui.create_column(
-            self.pb_row, self.pb_remove, self.pb_row_fitting, ui.create_stretch()))
+            self.pb_row, self.pb_remove, self.pb_row_fitting, self.binning_row, ui.create_stretch()))
 
-        #Chrono Group
-        self.transform_text = ui.create_label(text='Transform to spectrum: ', name='transform_text')
-        self.chrono_align_bin_pb = ui.create_push_button(text='Full binning', name='chrono_align_bin_pb',
-                                                     on_clicked='align_bin_chrono')
-
-        self.pb_row = ui.create_row(self.transform_text, self.chrono_align_bin_pb, ui.create_stretch())
-        self.d1_chrono_group = ui.create_group(title='1D Chrono Tools', content=ui.create_column(
-            self.pb_row, ui.create_stretch()
-        ))
 
         #Hyperspectral group
         self.deconvolution_text = ui.create_label(text='Signal deconvolution (interactions): (', name='deconvolution_text')
@@ -380,27 +398,22 @@ class View:
 
         self.dec_text = ui.create_label(text='Signal decomposition (components): (', name='dec_text')
         self.comp_le = ui.create_line_edit(name='comp_le', width=15)
-        self.pca_pb = ui.create_push_button(text='SVD', name='pca3_pb', on_clicked='pca')
+        self.pca_pb = ui.create_push_button(text='Masked SVD', name='pca3_pb', on_clicked='pca')
+        self.pca2_pb = ui.create_push_button(text='Full SVD', name='pca3_pb', on_clicked='pca_full')
         self.decomposition_row = ui.create_row(self.dec_text, self.comp_le, self.close_par, ui.create_spacing(5),
-                                               self.pca_pb,
+                                               self.pca_pb, self.pca2_pb,
                                                ui.create_stretch())
 
-        self.binning_text = ui.create_label(text='Bin data (x, y, E): (', name='binning_text')
-        self.x_le = ui.create_line_edit(name='x_le', width=15)
-        self.y_le = ui.create_line_edit(name='y_le', width=15)
-        self.E_le = ui.create_line_edit(name='E_le', width=15)
-        self.bin_pb = ui.create_push_button(text='Ok', name='bin_pb', on_clicked='hspy_bin')
-        self.binning_row = ui.create_row(self.binning_text, self.x_le, self.y_le,
-                                         self.E_le, self.close_par, ui.create_spacing(5), self.bin_pb, ui.create_stretch())
 
         self.hspec_group = ui.create_group(title='Hyperspectral Image', content=ui.create_column(
-            self.binning_row, self.pb_row, self.decomposition_row, ui.create_stretch()
+            self.pb_row, self.decomposition_row, ui.create_stretch()
         ))
 
-        self.last_text = ui.create_label(text='Orsay Tools v0.1.0', name='last_text')
-        self.last_row = ui.create_row(ui.create_stretch(), self.last_text)
+        self.last_text = ui.create_label(text='<a href="https://github.com/OrsayDev/OrsaySuite">Orsay Tools v0.1.0</a>', name='last_text')
+        self.left_text = ui.create_label(text='<a href="https://hyperspy.org/hyperspy-doc/current/index.html">HyperSpy v1.6.5</a>', name='left_text')
+        self.last_row = ui.create_row(self.left_text, ui.create_stretch(), self.last_text)
 
-        self.ui_view = ui.create_column(self.general_group, self.d1_chrono_group,
+        self.ui_view = ui.create_column(self.general_group,
                                         self.hspec_group, self.d2_group, self.last_row)
 
 def create_panel(document_controller, panel_id, properties):

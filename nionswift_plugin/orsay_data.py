@@ -18,6 +18,7 @@ class HspySignal1D:
 
         self.signal_calib = di.dimensional_calibrations[len(di.dimensional_calibrations)-1]
         self.signal_size = di.data.shape[-1]
+        self.nav_len = len(self.hspy_gd.data.shape) - 1
 
         for index in range(len(di.dimensional_calibrations)):
             self.hspy_gd.axes_manager[index].offset = di.dimensional_calibrations[index].offset
@@ -36,7 +37,12 @@ class HspySignal1D:
         self.hspy_gd.interpolate_in_between(256*3 - 1, 256*3 + 1, show_progressbar=False)
 
     def rebin(self, scale):
-        self.hspy_gd = self.hspy_gd.rebin(scale=scale)
+        if self.nav_len == 0:
+            self.hspy_gd = self.hspy_gd.rebin(scale=[scale[2]])
+        elif self.nav_len == 1:
+            self.hspy_gd = self.hspy_gd.rebin(scale=[scale[1], scale[2]])
+        elif self.nav_len == 2:
+            self.hspy_gd = self.hspy_gd.rebin(scale=scale)
 
     def align_zlp(self):
         self.hspy_gd.align_zero_loss_peak(show_progressbar=False)
@@ -149,13 +155,17 @@ class HspySignal1D:
 
         return self._get_data(m.as_signal().isig[r1:r2], 'lorentzian_fit_')
 
-    def signal_decomposition(self, range, components=3):
-        r1 = self._rel_to_abs(range[0])
-        r2 = self._rel_to_abs(range[1])
+    def signal_decomposition(self, range=[0, 1], components=3, mask=True):
 
-        signal_mask2 = self.hspy_gd._get_signal_signal(dtype='bool')
-        signal_mask2.isig[r1: r2] = True
-        self.hspy_gd.decomposition(True, svd_solver='full', signal_mask=signal_mask2)
+        if mask:
+            r1 = self._rel_to_abs(range[0])
+            r2 = self._rel_to_abs(range[1])
+
+            signal_mask2 = self.hspy_gd._get_signal_signal(dtype='bool')
+            signal_mask2.isig[r1: r2] = True
+            self.hspy_gd.decomposition(True, svd_solver='full', signal_mask=signal_mask2)
+        else:
+            self.hspy_gd.decomposition(True, svd_solver='full')
 
         variance = self.hspy_gd.get_explained_variance_ratio()
         spim_dec = self.hspy_gd.get_decomposition_model(components)
