@@ -83,10 +83,10 @@ class handler:
                     setattr(widg, "enabled", enabled)
 
     def prepare_widget_enable(self, value):
-        self.event_loop.create_task(self.do_enable(False, ["init_pb", 'host_value', 'port_value', 'abt_pb']))
+        self.event_loop.create_task(self.do_enable(False, ["init_pb"]))
 
     def prepare_widget_disable(self, value):
-        self.event_loop.create_task(self.do_enable(False, ["init_pb", 'host_value', 'port_value', 'abt_pb']))
+        self.event_loop.create_task(self.do_enable(False, ["init_pb"]))
 
     def prepare_free_widget_enable(self,
                                    value):  # THAT THE SECOND EVENT NEVER WORKS. WHAT IS THE DIF BETWEEN THE FIRST?
@@ -174,9 +174,16 @@ class handler:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
     def deconvolve_rl_hspec(self, widget):
-        self._deconvolve_hspec('Richardson lucy')
+        try:
+            val = int(self.int_le.text)
+            self._deconvolve_hspec('Richardson lucy', val)
+        except ValueError:
+            logging.info("***PANEL***: Interaction value must be integer.")
 
-    def _deconvolve_hspec(self, type):
+
+
+
+    def _deconvolve_hspec(self, type, interactions):
         self.__current_DI = None
 
         self.__current_DI = self._pick_di()
@@ -189,8 +196,8 @@ class handler:
             if dis and len(dis) == 2:
                 self.gd = orsay_data.HspySignal1D(dis[0].data_item)  # hspec
                 self.spec_gd = orsay_data.HspySignal1D(dis[1].data_item) #spec
-                self.gd.deconvolution(self.spec_gd, type)
-                self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
+                new_di = self.gd.deconvolution(self.spec_gd, type, interactions)
+                self.event_loop.create_task(self.data_item_show(new_di))
             else:
                 logging.info('***PANEL***: Could not find referenced Data Item.')
 
@@ -252,6 +259,7 @@ class handler:
                     if graphic.type == 'rect-graphic' and len(val_spec) == 2:
                         self.gd = orsay_data.HspySignal1D(hspec.data_item)
                         action(self.gd, val_spec)
+                        return
             else:
                 logging.info('***PANEL***: Could not find referenced Data Item.')
 
@@ -267,14 +275,12 @@ class handler:
     def fit_lorentzian(self, widget):
         self._general_actions('fitting', 'lorentzian')
 
-    def pca3(self, widget):
-        self._general_actions('decomposition', 3)
-
-    def pca5(self, widget):
-        self._general_actions('decomposition', 5)
-
-    def pca10(self, widget):
-        self._general_actions('decomposition', 10)
+    def pca(self, widget):
+        try:
+            val = int(self.comp_le.text)
+            self._general_actions('decomposition', val)
+        except ValueError:
+            logging.info("***PANEL***: Interaction value must be integer.")
 
     def hspy_bin(self, widget):
         try:
@@ -308,6 +314,9 @@ class View:
 
     def __init__(self):
         ui = Declarative.DeclarativeUI()
+
+        #General elements. Used often.
+        self.close_par = ui.create_label(text=')')
 
         #Gain group
         self.bin_laser_pb = ui.create_push_button(text='Bin laser', name='bin_laser_pb', on_clicked='bin_laser')
@@ -362,25 +371,27 @@ class View:
         ))
 
         #Hyperspectral group
-        self.deconvolution_text = ui.create_label(text='Signal deconvolution: ', name='deconvolution_text')
+        self.deconvolution_text = ui.create_label(text='Signal deconvolution (interactions): (', name='deconvolution_text')
+        self.int_le = ui.create_line_edit(name='int_le', width=15)
         self.dec_rl_pb = ui.create_push_button(text='Richardson-Lucy', name='dec_rl_pb',
                                             on_clicked='deconvolve_rl_hspec')
-        self.pb_row = ui.create_row(self.deconvolution_text, self.dec_rl_pb, ui.create_stretch())
+        self.pb_row = ui.create_row(self.deconvolution_text, self.int_le, self.close_par, ui.create_spacing(5),
+                                    self.dec_rl_pb, ui.create_stretch())
 
-        self.dec_text = ui.create_label(text='Signal decomposition: ', name='dec_text')
-        self.pca3_pb = ui.create_push_button(text='PCA3', name='pca3_pb', on_clicked='pca3')
-        self.pca5_pb = ui.create_push_button(text='PCA5', name='pca5_pb', on_clicked='pca5')
-        self.pca10_pb = ui.create_push_button(text='PCA10', name='pca10_pb', on_clicked='pca10')
-        self.decomposition_row = ui.create_row(self.dec_text, self.pca3_pb, self.pca5_pb, self.pca10_pb,
+        self.dec_text = ui.create_label(text='Signal decomposition (components): (', name='dec_text')
+        self.comp_le = ui.create_line_edit(name='comp_le', width=15)
+        self.pca_pb = ui.create_push_button(text='SVD', name='pca3_pb', on_clicked='pca')
+        self.decomposition_row = ui.create_row(self.dec_text, self.comp_le, self.close_par, ui.create_spacing(5),
+                                               self.pca_pb,
                                                ui.create_stretch())
 
-        self.binning_text = ui.create_label(text='Bin data (x, y, E): ', name='binning_text')
+        self.binning_text = ui.create_label(text='Bin data (x, y, E): (', name='binning_text')
         self.x_le = ui.create_line_edit(name='x_le', width=15)
         self.y_le = ui.create_line_edit(name='y_le', width=15)
         self.E_le = ui.create_line_edit(name='E_le', width=15)
         self.bin_pb = ui.create_push_button(text='Ok', name='bin_pb', on_clicked='hspy_bin')
         self.binning_row = ui.create_row(self.binning_text, self.x_le, self.y_le,
-                                         self.E_le, self.bin_pb, ui.create_stretch())
+                                         self.E_le, self.close_par, ui.create_spacing(5), self.bin_pb, ui.create_stretch())
 
         self.hspec_group = ui.create_group(title='Hyperspectral Image', content=ui.create_column(
             self.binning_row, self.pb_row, self.decomposition_row, ui.create_stretch()

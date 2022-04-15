@@ -165,13 +165,14 @@ class HspySignal1D:
     def _rel_to_abs(self, val):
         return self.signal_calib.offset + val*self.signal_calib.scale*self.signal_size
 
-    def deconvolution(self, psf, type):
+    def deconvolution(self, psf, type, interactions):
         # if type=='Fourier log':
         #     self.hspy_gd.fourier_log_deconvolution(psf.hspy_gd)
         # elif type=='Fourier ratio':
         #     self.hspy_gd.fourier_ratio_deconvolution(psf.hspy_gd)
         if type=='Richardson lucy':
-            self.hspy_gd.richardson_lucy_deconvolution(psf.hspy_gd, show_progressbar=False)
+            data = self.hspy_gd.richardson_lucy_deconvolution(psf.hspy_gd, interactions, show_progressbar=False)
+        return self._get_data(data, 'RLdec' + str(interactions) + '_')
 
 class HspyGain(HspySignal1D):
     def __init__(self, di):
