@@ -8,5 +8,5 @@ setup(
     url="https://github.com/yvesauad/yvorsay-instrument",
     packages=['nionswift_plugin'],
     python_requires='>=3.8.5',
-    install_requires=["hyperspy>=1.6.5"]
+    install_requires=["hyperspy==1.6.5"]
 )
