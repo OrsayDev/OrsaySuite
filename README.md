@@ -3,13 +3,13 @@ Data analysis in Nionswift using Hyperspy
 
 ## Installation
 
-Go to your Nionswift conda environment:
-
-``conda activate nionswift``
-
 Clone the OrsaySuite environment:
 
 ``git clone https://github.com/OrsayDev/OrsaySuite.git``
+
+Go to your Nionswift conda environment:
+
+``conda activate nionswift``
 
 Install OrsaySuite with ``pip -e``:
 
