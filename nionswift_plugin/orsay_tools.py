@@ -111,6 +111,7 @@ class handler:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
     def correct_gain(self, widget):
+        print('try')
         pass
 
     def flip_signal(self, widget):
