@@ -110,8 +110,35 @@ class handler:
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
+
+
+    def interpolate2 (self, widget):
+        self.__current_DI = None
+
+        self.__current_DI = self._pick_di()
+
+        if self.__current_DI:
+            self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
+            corrected_data = self.gd.detector_junctions()
+            self.event_loop.create_task(self.data_item_show(corrected_data))
+        else:
+            logging.info('***PANEL***: Could not find referenced Data Item.')
+
     def correct_gain(self, widget):
-        print('try')
+        #Not yet implemented. Needs ROI in metadata
+        self.__current_DI = None
+
+        self.__current_DI = self._pick_di()
+
+        if self.__current_DI:
+            metadata_keys = self.__current_DI.data_item.metadata.keys()
+            metadata_name = 'hardware_source'
+            if metadata_name in metadata_keys:
+                ht = self.__current_DI.data_item.metadata['hardware_source']['high_tension']
+                ht = str(int(ht/1000))
+                print('Not implemented')
+            else:
+                print('No ' + metadata_name + ' metadata available for this data_item')
         pass
 
     def flip_signal(self, widget):
@@ -358,7 +385,7 @@ class View:
                                                      on_clicked='fit_lorentzian')
 
         self.simple_text = ui.create_label(text='Simple corrections: ', name='simple_text')
-        self.interpolate_pb = ui.create_push_button(text='Interpolate', name='interpolate_pb', on_clicked='interpolate')
+        self.interpolate_pb = ui.create_push_button(text='Interpolate', name='interpolate_pb', on_clicked='interpolate2')
         self.align_zlp_pb = ui.create_push_button(text='Align ZLP', name='align_zlp_pb', on_clicked='align_zlp')
         self.cgain_pb = ui.create_push_button(text='Correct Gain', name='cgain_pb',
                                               on_clicked='correct_gain')

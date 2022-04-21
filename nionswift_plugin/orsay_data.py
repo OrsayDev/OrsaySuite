@@ -184,6 +184,60 @@ class HspySignal1D:
             data = self.hspy_gd.richardson_lucy_deconvolution(psf.hspy_gd, interactions, show_progressbar=False)
         return self._get_data(data, 'RLdec' + str(interactions) + '_')
 
+    def _pixel_filler_Datum1(self, pixel, corrected_data, raw_data):
+        # Added by ltizei. This is used to complete missing pixels in the Medipix detector junctions. This will
+        # be used in the interpolate function
+        average1 = numpy.average(raw_data[..., pixel - 1])  # "last" normal pixel
+        average2 = numpy.average(raw_data[..., pixel + 2])  # next normal pixel
+        diff = average1 - average2
+
+        cut1 = raw_data[..., pixel]
+        cut2 = raw_data[..., pixel + 1]
+
+        for i in range(5):
+            corrected_data[..., pixel + i] = (1 - i / 4) * cut1 + (i / 4) * cut2
+            average_correction = numpy.mean(corrected_data[..., pixel + i:pixel + 1 + i])
+            corrected_data[..., pixel + i] = corrected_data[..., pixel + i] * (average1 - ((i + 1) / 5) * diff) / (
+                average_correction)
+
+        return corrected_data
+
+
+    def detector_junctions(self):
+        data_shape = self.hspy_gd.data.shape
+        raw_data = self.hspy_gd.data
+        # parameters
+        pixel1 = 255  # intense pixels 255 and 256
+        pixel2 = 514  # intense pixels 511 and 512
+        pixel3 = 773  # intense pixels 768 and 769
+        pixel_list = [pixel1, pixel2, pixel3]
+
+        data_shape_mod = numpy.array(data_shape)
+        data_shape_mod[-1] = data_shape_mod[-1] + 9
+        corrected_data = numpy.zeros((data_shape_mod))
+
+        # Fill up the correct data, already present
+        corrected_data[..., 0:255] = raw_data[...,
+                                     0:255]  # data up to pixel1 is unchanged, 3pixels shift with 5 zeros afterwards
+        corrected_data[..., 260:514] = raw_data[..., 257:511]  # data copied and shifted by 3 pixels, with 5 zeros
+        corrected_data[..., 519:773] = raw_data[..., 513:767]  # data copied and shifted by 3 pixels, with 5 zeros
+        corrected_data[..., 778:] = raw_data[..., 769:]
+
+        print('Data new shape: ' + str(corrected_data.shape))
+
+        for pixel in pixel_list:
+            corrected_data = self._pixel_filler_Datum1(pixel, corrected_data, raw_data)
+
+        corrected_data_hs = hs.signals.Signal1D(corrected_data)
+        corrected_data_hs.set_signal_type("EELS")
+
+        for index in range(len(corrected_data.shape)):
+            corrected_data_hs.axes_manager[index].offset =  self.hspy_gd.axes_manager[index].offset
+            corrected_data_hs.axes_manager[index].scale = self.hspy_gd.axes_manager[index].scale
+            corrected_data_hs.axes_manager[index].units = self.hspy_gd.axes_manager[index].units
+
+        return self._get_data(corrected_data_hs, 'Corrected ')
+
 class HspyGain(HspySignal1D):
     def __init__(self, di):
         super().__init__(di)
