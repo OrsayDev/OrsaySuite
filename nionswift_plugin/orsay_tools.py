@@ -110,9 +110,7 @@ class handler:
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
-
-
-    def interpolate2 (self, widget):
+    def correct_junctions(self, widget):
         self.__current_DI = None
 
         self.__current_DI = self._pick_di()
@@ -171,18 +169,6 @@ class handler:
 
     def align_bin_chrono(self, widget):
         self._align_chrono(align=False, bin=True)
-
-    def interpolate(self, widget):
-        self.__current_DI = None
-
-        self.__current_DI = self._pick_di()
-
-        if self.__current_DI:
-            self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
-            self.gd.interpolate()
-            self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
-        else:
-            logging.info('***PANEL***: Could not find referenced Data Item.')
 
     def gain_profile_data_item(self, widget):
         self.__current_DI = None
@@ -385,7 +371,7 @@ class View:
                                                      on_clicked='fit_lorentzian')
 
         self.simple_text = ui.create_label(text='Simple corrections: ', name='simple_text')
-        self.interpolate_pb = ui.create_push_button(text='Interpolate', name='interpolate_pb', on_clicked='interpolate2')
+        self.cj_pb = ui.create_push_button(text='Correct Junctions', name='cj_pb', on_clicked='correct_junctions')
         self.align_zlp_pb = ui.create_push_button(text='Align ZLP', name='align_zlp_pb', on_clicked='align_zlp')
         self.cgain_pb = ui.create_push_button(text='Correct Gain', name='cgain_pb',
                                               on_clicked='correct_gain')
@@ -403,7 +389,7 @@ class View:
         self.E_le = ui.create_line_edit(name='E_le', width=25)
         self.bin_pb = ui.create_push_button(text='Bin', name='bin_pb', on_clicked='hspy_bin')
 
-        self.pb_row = ui.create_row(self.simple_text, self.interpolate_pb, self.align_zlp_pb, self.cgain_pb,
+        self.pb_row = ui.create_row(self.simple_text, self.cj_pb, self.align_zlp_pb, self.cgain_pb,
                                     self.flip_pb, ui.create_stretch())
         self.pb_remove = ui.create_row(self.background_text, self.remove_pl_pb, self.remove_pl_offset, ui.create_stretch())
         self.pb_row_fitting = ui.create_row(self.fit_text, self.fit_gaussian_pb, self.fit_lorentzian_pb,

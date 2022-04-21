@@ -223,8 +223,6 @@ class HspySignal1D:
         corrected_data[..., 519:773] = raw_data[..., 513:767]  # data copied and shifted by 3 pixels, with 5 zeros
         corrected_data[..., 778:] = raw_data[..., 769:]
 
-        print('Data new shape: ' + str(corrected_data.shape))
-
         for pixel in pixel_list:
             corrected_data = self._pixel_filler_Datum1(pixel, corrected_data, raw_data)
 
