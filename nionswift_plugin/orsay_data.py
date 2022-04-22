@@ -1,3 +1,5 @@
+import os
+
 import numpy
 from nion.data import Calibration
 from nion.swift.model import DataItem
@@ -230,11 +232,34 @@ class HspySignal1D:
         corrected_data_hs.set_signal_type("EELS")
 
         for index in range(len(corrected_data.shape)):
-            corrected_data_hs.axes_manager[index].offset =  self.hspy_gd.axes_manager[index].offset
+            corrected_data_hs.axes_manager[index].offset = self.hspy_gd.axes_manager[index].offset
             corrected_data_hs.axes_manager[index].scale = self.hspy_gd.axes_manager[index].scale
             corrected_data_hs.axes_manager[index].units = self.hspy_gd.axes_manager[index].units
 
         return self._get_data(corrected_data_hs, 'Corrected ')
+
+    def correct_gain_hs(self, ht, threshold, gain_roi):
+        #This will need to change to a "setup" folder
+        path_gain ='/home/ltizei/arq/Ltizei_2022/Python/OrsaySuite_fork/OrsaySuite/nionswift_plugin/Gain_Merlin'
+        os.chdir(path_gain)
+        list_dir = os.listdir()
+        for dir in list_dir:
+            if dir.startswith(str(ht)):
+                dir_gain = dir
+
+        path_gain = path_gain+'/'+dir_gain
+        os.chdir(path_gain)
+        list_dir = os.listdir()
+
+        for file in list_dir:
+            if str(threshold) in file and 'dm4' in file: #Should change for hspy in the future
+                gain = hs.load(path_gain + '/'+ file)
+        gain_signal = gain.isig[gain_roi[0]:gain_roi[2], gain_roi[1]:gain_roi[3]].sum(axis=1)
+
+        self.hspy_gd =  self.hspy_gd/gain_signal
+
+
+
 
 class HspyGain(HspySignal1D):
     def __init__(self, di):
