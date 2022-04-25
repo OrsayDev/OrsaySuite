@@ -1,0 +1,9 @@
+200kV
+*1 50mrad8I
+current emission 3.3uA-CCD current 304 pA
+VOA in HAADF out Monochromatem slit out
+EELS GainSetting
+EELS aperture 2mm
+
+Merlin 24bit full
+2000x1s

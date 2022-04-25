@@ -7,6 +7,9 @@ from nion.swift.model import Utility
 from nion.data import DataAndMetadata
 import hyperspy.api as hs
 
+
+from .aux_files.config import read_data_gain
+
 import logging
 
 __author__ = "Yves Auad"
@@ -28,6 +31,8 @@ class HspySignal1D:
             self.hspy_gd.axes_manager[index].units = di.dimensional_calibrations[index].units
 
         #logging.info(f'***HSPY***: The axes of the collected data is {self.hspy_gd.axes_manager}.')
+
+
 
     def flip(self):
         signal_axis = len(self.hspy_gd.data.shape)-1
@@ -240,25 +245,13 @@ class HspySignal1D:
 
     def correct_gain_hs(self, ht, threshold, gain_roi):
         #This will need to change to a "setup" folder
-        path_gain ='/home/ltizei/arq/Ltizei_2022/Python/OrsaySuite_fork/OrsaySuite/nionswift_plugin/Gain_Merlin'
-        os.chdir(path_gain)
-        list_dir = os.listdir()
-        for dir in list_dir:
-            if dir.startswith(str(ht)):
-                dir_gain = dir
+        self.__gain_file = read_data_gain.FileManager(ht, threshold)
 
-        path_gain = path_gain+'/'+dir_gain
-        os.chdir(path_gain)
-        list_dir = os.listdir()
+        gain_signal_mean = numpy.mean(self.__gain_file.gain.data)
+        vertical_bin =gain_roi[3] - gain_roi[1]
+        gain_signal = self.__gain_file.gain.isig[gain_roi[0]:gain_roi[2], gain_roi[1]:gain_roi[3]].sum(axis=1)
 
-        for file in list_dir:
-            if str(threshold) in file and 'dm4' in file: #Should change for hspy in the future
-                gain = hs.load(path_gain + '/'+ file)
-        gain_signal = gain.isig[gain_roi[0]:gain_roi[2], gain_roi[1]:gain_roi[3]].sum(axis=1)
-
-        self.hspy_gd =  self.hspy_gd/gain_signal
-
-
+        self.hspy_gd = self.hspy_gd*gain_signal_mean*vertical_bin/(gain_signal)
 
 
 class HspyGain(HspySignal1D):
