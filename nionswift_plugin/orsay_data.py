@@ -1,9 +1,14 @@
+import os
+
 import numpy
 from nion.data import Calibration
 from nion.swift.model import DataItem
 from nion.swift.model import Utility
 from nion.data import DataAndMetadata
 import hyperspy.api as hs
+
+
+from .aux_files.config import read_data_gain
 
 import logging
 
@@ -26,6 +31,8 @@ class HspySignal1D:
             self.hspy_gd.axes_manager[index].units = di.dimensional_calibrations[index].units
 
         #logging.info(f'***HSPY***: The axes of the collected data is {self.hspy_gd.axes_manager}.')
+
+
 
     def flip(self):
         signal_axis = len(self.hspy_gd.data.shape)-1
@@ -230,11 +237,22 @@ class HspySignal1D:
         corrected_data_hs.set_signal_type("EELS")
 
         for index in range(len(corrected_data.shape)):
-            corrected_data_hs.axes_manager[index].offset =  self.hspy_gd.axes_manager[index].offset
+            corrected_data_hs.axes_manager[index].offset = self.hspy_gd.axes_manager[index].offset
             corrected_data_hs.axes_manager[index].scale = self.hspy_gd.axes_manager[index].scale
             corrected_data_hs.axes_manager[index].units = self.hspy_gd.axes_manager[index].units
 
         return self._get_data(corrected_data_hs, 'Corrected ')
+
+    def correct_gain_hs(self, ht, threshold, gain_roi):
+        #This will need to change to a "setup" folder
+        self.__gain_file = read_data_gain.FileManager(ht, threshold)
+
+        gain_signal_mean = numpy.mean(self.__gain_file.gain.data)
+        vertical_bin =gain_roi[3] - gain_roi[1]
+        gain_signal = self.__gain_file.gain.isig[gain_roi[0]:gain_roi[2], gain_roi[1]:gain_roi[3]].sum(axis=1)
+
+        self.hspy_gd = self.hspy_gd*gain_signal_mean*vertical_bin/(gain_signal)
+
 
 class HspyGain(HspySignal1D):
     def __init__(self, di):

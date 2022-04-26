@@ -123,21 +123,29 @@ class handler:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
     def correct_gain(self, widget):
-        #Not yet implemented. Needs ROI in metadata
+        #Not yet implemented. Needs ROI and threshold in metadata
         self.__current_DI = None
 
         self.__current_DI = self._pick_di()
 
         if self.__current_DI:
+            self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
             metadata_keys = self.__current_DI.data_item.metadata.keys()
             metadata_name = 'hardware_source'
             if metadata_name in metadata_keys:
                 ht = self.__current_DI.data_item.metadata['hardware_source']['high_tension']
                 ht = str(int(ht/1000))
-                print('Not implemented')
+                threshold = 20 #NOT IMPLEMENTED: must come from metadata
+                gain_roi = [0, 0, 1024, 64] #NOT IMPLEMENTED: must come from metadata
+                #current implentation is x0, y0, x1, y1. CHECK IF TRUE LATER in metadata
+                self.gd.correct_gain_hs(ht, threshold, gain_roi)
+
+                self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
+                logging.info('***PANEL***: Not implemented. Needs to implement ROI and THRESHOLD from metadata')
             else:
-                print('No ' + metadata_name + ' metadata available for this data_item')
-        pass
+                logging.info('***PANEL***: No ' + metadata_name + ' metadata available for this data_item')
+        else:
+            logging.info('***PANEL***: Could not find referenced Data Item.')
 
     def flip_signal(self, widget):
         self.__current_DI = None
