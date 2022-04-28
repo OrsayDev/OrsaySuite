@@ -7,18 +7,13 @@ from nion.ui import Declarative
 from nion.ui import UserInterface
 from nion.data import Calibration
 from nion.data import DataAndMetadata
-from nion.swift.model import HardwareSource
 from nion.swift.model import DataItem
 from nion.swift.model import Utility
-from nion.swift import Facade
 
 from . import orsay_data
 
-import os
-import json
 import logging
 import numpy
-import datetime
 
 _ = gettext.gettext
 

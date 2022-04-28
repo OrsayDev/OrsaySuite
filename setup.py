@@ -5,7 +5,7 @@ correction_files = glob('nionswift_plugin/orsay_suite/aux_files/config/Gain_Merl
 
 setup(
     name="OrsaySuite",
-    version="0.0.15",
+    version="0.0.16",
     author="Yves Auad",
     description="Tools for analyzing data using Hyperspy",
     url="https://github.com/yvesauad/yvorsay-instrument",

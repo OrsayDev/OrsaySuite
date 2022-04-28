@@ -1,4 +1,5 @@
 import os
+import logging
 
 import numpy
 from nion.data import Calibration
@@ -7,10 +8,7 @@ from nion.swift.model import Utility
 from nion.data import DataAndMetadata
 import hyperspy.api as hs
 
-
-from .aux_files.config import read_data_gain
-
-import logging
+from . import read_data_gain
 
 __author__ = "Yves Auad"
 
