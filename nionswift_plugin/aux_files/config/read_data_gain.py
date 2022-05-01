@@ -5,32 +5,20 @@ class FileManager:
     def __init__(self, ht, threshold):
         self.ht = ht
         self.ht = threshold
+        self.filename = str(ht)+'kV_Thresh_'+str(threshold)+'.hspy'
 
         if (os.name == 'posix'): #this is linux
-            self.path_gain = './OrsaySuite/nionswift_plugin/aux_files/config/Gain_Merlin/'
-            list_dir = os.listdir(self.path_gain)
-            for dir in list_dir:
-                if dir.startswith(str(ht)):
-                    dir_gain = dir
-
-            self.path_gain = self.path_gain + '/' + dir_gain+'/'
-            list_dir = os.listdir(self.path_gain)
-
-            for file in list_dir:
-                if str(threshold) in file and '.hspy' in file:
-                    self.filename = file
-                    pass
-
-
-
-            abs_path = os.path.abspath('/home/ProgramData/Microscope/' + self.filename + '.hspy')
-
-            if os.path.isfile(abs_path+self.filename):
-                self.gain = hs.load(abs_path + self.filename)
-
-            elif os.path.isfile(self.path_gain + self.filename):
-                self.gain = hs.load(self.path_gain + self.filename)
-
+            abs_path = os.path.abspath('/home/ProgramData/Microscope/' + self.filename)
+            try:
+                with open(abs_path) as savfile:
+                    self.abs_path = abs_path
+                    self.gain = hs.load(abs_path + self.filename)
+            except FileNotFoundError:
+                abs_path = os.path.join(os.path.dirname(__file__)+'/Gain_Merlin/' +str(ht)+'kV', self.filename)  # this works
+                self.abs_path = abs_path
+                with open(abs_path) as savfile:
+                    self.abs_path = abs_path
+                    self.gain = hs.load(abs_path)
 
         if (os.name == 'nt'):  # this is Windows
             print('Read_data_gain : Not implemented for Windows')
