@@ -1,0 +1,8 @@
+100kV
+*2 50mrad8I
+current emission 8uA
+VOA out HAADF out Monochromatem slit out
+EELS GainSetting
+EELS aperture 2mm
+Merlin 24bit full
+1000x1s
