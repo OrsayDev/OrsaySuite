@@ -52,6 +52,11 @@ class HspySignal1D:
     def align_zlp(self):
         self.hspy_gd.align_zero_loss_peak(show_progressbar=False)
 
+    def align_zlp_signal_range(self, range):
+        r1 = self._rel_to_abs(range[0])
+        r2 = self._rel_to_abs(range[1])
+        self.hspy_gd.align_zero_loss_peak(subpixel=False, show_progressbar=False, signal_range=[r1, r2])
+
     def get_data(self):
         return self.hspy_gd.data
 

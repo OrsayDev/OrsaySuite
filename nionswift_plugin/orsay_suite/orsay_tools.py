@@ -167,12 +167,6 @@ class handler:
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
-    def align_zlp(self, widget):
-        self._align_chrono()
-
-    def align_bin_chrono(self, widget):
-        self._align_chrono(align=False, bin=True)
-
     def gain_profile_data_item(self, widget):
         self.__current_DI = None
 
@@ -229,6 +223,10 @@ class handler:
 
         self.__current_DI = self._pick_di()
 
+        def align_zlp_action(hspy_signal, val):
+            hspy_signal.align_zlp_signal_range(val)
+            self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
+
         def fitting_action(hspy_signal, val):
             if which == 'gaussian':
                 new_di = hspy_signal.plot_gaussian(val)
@@ -252,6 +250,8 @@ class handler:
             action = remove_background_action
         elif type == 'decomposition':
             action = decomposition_action
+        elif type == 'align_zlp':
+            action = align_zlp_action
         else:
             raise Exception("***PANEL***: No action function was selected. Please check the correct type.")
 
@@ -296,6 +296,9 @@ class handler:
 
     def fit_lorentzian(self, widget):
         self._general_actions('fitting', 'lorentzian')
+
+    def align_zlp(self, widget):
+        self._general_actions('align_zlp', 'None')
 
     def pca(self, widget):
         try:
