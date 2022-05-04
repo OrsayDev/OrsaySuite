@@ -17,7 +17,7 @@ class HspySignal1D:
         self.di = di
         new_data = numpy.copy(di.data)
         self.hspy_gd = hs.signals.Signal1D(new_data)
-        self.hspy_gd.set_signal_type("EELEEEEEESSSSS")
+        self.hspy_gd.set_signal_type("EELS")
 
         self.signal_calib = di.dimensional_calibrations[len(di.dimensional_calibrations)-1]
         self.signal_size = di.data.shape[-1]
