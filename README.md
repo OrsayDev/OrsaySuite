@@ -15,7 +15,7 @@ Go to your Nionswift conda environment:
 
 Install OrsaySuite with ``pip`` by using:
 
-``pip install .``
+``pip install -e .``
 
 Now, running Nionswift as ``nionswift`` will show you a window called Orsay Tools.
 
