@@ -192,12 +192,9 @@ class handler:
     def deconvolve_rl_hspec(self, widget):
         try:
             val = int(self.int_le.text)
-            self._deconvolve_hspec('Richardson lucy', val)
         except ValueError:
             logging.info("***PANEL***: Interaction value must be integer.")
-
-
-
+        self._deconvolve_hspec('Richardson lucy', val)
 
     def _deconvolve_hspec(self, type, interactions):
         self.__current_DI = None
@@ -303,9 +300,10 @@ class handler:
     def pca(self, widget):
         try:
             val = int(self.comp_le.text)
-            self._general_actions('decomposition', val)
         except ValueError:
             logging.info("***PANEL***: Interaction value must be integer.")
+        self._general_actions('decomposition', val)
+
 
     def pca_full(self, widget):
         self._pca_full()
@@ -313,16 +311,16 @@ class handler:
     def _pca_full(self):
         try:
             val = int(self.comp_le.text)
-            self.__current_DI = self._pick_di()
-            if self.__current_DI:
-                self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)  # hspec
-                var, new_di = self.gd.signal_decomposition(components=val, mask=False)
-                self.event_loop.create_task(self.data_item_show(new_di))
-                self.event_loop.create_task(self.data_item_show(var))
-            else:
-                logging.info('***PANEL***: Could not find referenced Data Item.')
         except ValueError:
             logging.info("***PANEL***: Components value must be integer.")
+        self.__current_DI = self._pick_di()
+        if self.__current_DI:
+            self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)  # hspec
+            var, new_di = self.gd.signal_decomposition(components=val, mask=False)
+            self.event_loop.create_task(self.data_item_show(new_di))
+            self.event_loop.create_task(self.data_item_show(var))
+        else:
+            logging.info('***PANEL***: Could not find referenced Data Item.')
 
     def hspy_bin(self, widget):
         try:
