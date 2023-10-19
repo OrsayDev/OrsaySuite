@@ -11,6 +11,7 @@ from nion.swift.model import DataItem
 from nion.swift.model import Utility
 
 from . import orsay_data
+from . import drift_correction
 
 import logging
 import numpy
@@ -33,7 +34,6 @@ class DataItemCreation():
         self.xdata = DataAndMetadata.new_data_and_metadata(array, self.calibration, self.dimensional_calibrations,
                                                            metadata=self.metadata,
                                                            timezone=self.timezone, timezone_offset=self.timezone_offset)
-
         self.data_item = DataItem.DataItem()
         self.data_item.set_xdata(self.xdata)
         self.data_item.title = name
@@ -55,7 +55,9 @@ class handler:
 
         self.event_loop = document_controller.event_loop
         self.document_controller = document_controller
-
+        self.__drift = drift_correction.DriftCorrection()
+        self.__crossx_di = None
+        self.__crossy_di = None
 
     def init_handler(self):
         self.event_loop.create_task(self.do_enable(True, ['']))
@@ -64,6 +66,7 @@ class handler:
         self.E_le.text = '1'
         self.comp_le.text = '3'
         self.int_le.text = '10'
+        self.time_interval_value.text = '2'
 
 
     async def data_item_show(self, DI):
@@ -350,6 +353,30 @@ class handler:
         display_item = self.document_controller.selected_display_items
         return display_item
 
+    def activate_cross_correlation(self, widget, checked):
+        if checked:
+            self.__drift.start(self._update_cross_correlation, self.time_interval_value.text,
+                               self.static_reference_pb.checked)
+
+            if self.__crossx_di == None:
+                self.__crossx_di = DataItemCreation('XDrift', self.__drift.datax, 1, [0], [1], ['Time interval'])
+                self.event_loop.create_task(self.data_item_show(self.__crossx_di.data_item))
+                self.__crossx_di.data_item._enter_live_state()
+
+            if self.__crossy_di == None:
+                self.__crossy_di = DataItemCreation('YDrift', self.__drift.datay, 1, [0], [1], ['Time interval'])
+                self.__crossy_di.data_item._enter_live_state()
+                self.event_loop.create_task(self.data_item_show(self.__crossy_di.data_item))
+        else:
+            self.__drift.abort()
+
+    def _update_cross_correlation(self):
+        try:
+            self.__crossx_di.update_data_only(self.__drift.datax)
+            self.__crossy_di.update_data_only(self.__drift.datay)
+        except:
+            pass
+
 class View:
 
     def __init__(self):
@@ -431,8 +458,30 @@ class View:
         self.left_text = ui.create_label(text='<a href="https://hyperspy.org/hyperspy-doc/current/index.html">HyperSpy v1.6.5</a>', name='left_text')
         self.last_row = ui.create_row(self.left_text, ui.create_stretch(), self.last_text)
 
-        self.ui_view = ui.create_column(self.general_group,
-                                        self.hspec_group, self.d2_group, self.last_row)
+        self.hyperspytab = ui.create_tab(label = 'Processing', content = ui.create_column(self.general_group,
+                                        self.hspec_group, self.d2_group, self.last_row))
+
+        ##End of hyperspy data processing tab
+        # Begin of cross-correlation tab
+
+        self.act_corr_pb = ui.create_check_box(text='Continuous Measurement', name='act_corr_pb', on_checked_changed='activate_cross_correlation')
+        self.static_reference_pb = ui.create_check_box(text='Static reference', name='static_reference_pb')
+        self.time_interval_label = ui.create_label(text='Time interval (s)', name ='time_interval_label')
+        self.time_interval_value = ui.create_line_edit(name='time_interval_value', width = 50)
+
+        self.first_row = ui.create_row(self.act_corr_pb, self.static_reference_pb, ui.create_stretch(), self.time_interval_label, self.time_interval_value)
+
+
+
+        self.cross_tab = ui.create_tab(label='Drift Correction',
+                                       content=ui.create_column(self.first_row, ui.create_stretch()))
+        # End of cross-correlation tab
+
+        self.collection_tabs = ui.create_tabs(self.hyperspytab, self.cross_tab)
+
+        self.ui_view = ui.create_column(self.collection_tabs)
+        #self.ui_view = ui.create_column(self.general_group,
+        #                                self.hspec_group, self.d2_group, self.last_row)
 
 def create_panel(document_controller, panel_id, properties):
     ui_handler = handler(document_controller)
