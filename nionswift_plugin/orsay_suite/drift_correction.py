@@ -4,6 +4,7 @@ import logging, time, threading
 from scipy import signal
 import numpy
 import nion.instrumentation
+import json
 
 class DriftCorrection:
     def __init__(self):
@@ -16,6 +17,18 @@ class DriftCorrection:
         self.__array_index = 0
         self.__interval = 2
         self.__static_reference = False
+        self.__should_correct = False
+
+        self.shifter_calibration = dict()
+        self.shifter_calibration['calib.x'] = 0.
+        self.shifter_calibration['calib.y'] = 0.
+        try:
+            f = open('persistent.json')
+            self.shifter_calibration = json.load(f)
+        except FileNotFoundError:
+            with open('persistent.json', 'w') as f:
+                json.dump(self.shifter_calibration, f)
+
 
         #cams = list()
 
@@ -52,6 +65,8 @@ class DriftCorrection:
             self.__instrument = HardwareSource.HardwareSourceManager().get_instrument_by_id("VG_controller")
             logging.info("*** Drift Correction ***: VG_controller is found.")
 
+        self.__offset_valx, self.__offset_valy = self.get_shifters()
+
         #if self.__isChromaTEM:
         #    self.__scan = HardwareSource.HardwareSourceManager().get_hardware_source_for_hardware_source_id(
         #            "superscan")
@@ -60,15 +75,15 @@ class DriftCorrection:
         #            "open_scan_device")
 
     def abort(self):
-        print('abort')
         self.__abort = True
 
-    def start(self, callback, scan_system, interval, static_reference):
+    def start(self, callback, scan_system, interval, static_reference, should_correct):
         self.__scan = HardwareSource.HardwareSourceManager().get_hardware_source_for_hardware_source_id(
             scan_system)
         try:
             self.__interval = float(interval)
             self.__static_reference = static_reference
+            self.__should_correct = should_correct
         except:
             pass
 
@@ -107,6 +122,21 @@ class DriftCorrection:
         elif dimension == 1:
             self.__instrument.SetVal('CSH.v', value)
 
+    def displace_shifter_reset(self, dimension):
+        if dimension == 0:
+            self.__instrument.SetVal('CSH.u', self.__offset_valx)
+        elif dimension == 1:
+            self.__instrument.SetVal('CSH.v', self.__offset_valy)
+
+    def set_calibration(self, dimension, value):
+        if dimension == 0:
+            key = 'calib.x'
+        elif dimension == 1:
+            key = 'calib.y'
+        self.shifter_calibration[key] = value
+        with open('persistent.json', 'w') as f:
+            json.dump(self.shifter_calibration, f)
+
 
     def check_and_wait(self):
         time.sleep(self.__interval)
@@ -137,8 +167,9 @@ class DriftCorrection:
                 end = time.time()
                 logging.info(f'***Drift Correction***: Drift.x {xdrift} (nm/s). Drift.y: {ydrift} (nm/s). '
                              f'Interval: {end - start} (s).')
-                #self.__instrument.SetVal('CSH.u', 1-1e-9)
-                #self.__instrument.SetValAndConfirm('CSH.v', 1-1e-9, 0, 0)
+                if self.__should_correct:
+                    self.__instrument.SetVal('CSH.u', 1.0)
+                    self.__instrument.SetVal('CSH.v', 1.0)
 
                 callback()
             if not self.__static_reference: reference_image = new_image
