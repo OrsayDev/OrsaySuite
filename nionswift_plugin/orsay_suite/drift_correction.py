@@ -18,6 +18,7 @@ class DriftCorrection:
         self.__interval = 2
         self.__static_reference = False
         self.__should_correct = False
+        self.__auto_track = True
 
         self.shifter_calibration = dict()
         self.shifter_calibration['calib.x'] = 0.

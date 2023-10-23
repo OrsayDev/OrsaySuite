@@ -72,8 +72,11 @@ class handler:
         self.comp_le.text = '3'
         self.int_le.text = '10'
         self.time_interval_value.text = '2'
+        self.time_interval_manual_value.text = '2'
         self.calib_shifter_dim1_value.text = '1.0'
         self.calib_shifter_dim2_value.text = '1.0'
+        self.manual_drift_x_value.text = '1.0'
+        self.manual_drift_y_value.text = '1.0'
         self.scan_selection_dd.items = self.__drift.scan_systems
 
     async def data_item_show(self, DI):
@@ -417,6 +420,12 @@ class handler:
             self.__drift.displace_shifter_relative(1, float(self.calib_shifter_dim2_value.text))
             self.property_changed_event.fire("shifter_v")
 
+    def start_manual_correction(self, widget):
+        if widget.text == "Start":
+            widget.text = 'Abort'
+        elif widget.text == 'Abort':
+            widget.text = "Start"
+
     def reset_shifter(self, widget):
         self.__drift.displace_shifter_reset(0)
         self.__drift.displace_shifter_reset(1)
@@ -424,7 +433,6 @@ class handler:
         self.property_changed_event.fire("shifter_v")
 
     def set_calibration(self, widget):
-        print(widget.text)
         if widget.text == 'Ok 100 nm X':
             dim = 0
             value = self.shifter_u
@@ -559,7 +567,7 @@ class View:
                                                     on_clicked='activate_cross_correlation')
         self.static_reference_pb = ui.create_check_box(text='Static reference', name='static_reference_pb')
         self.time_interval_label = ui.create_label(text='Time interval (s)', name ='time_interval_label')
-        self.time_interval_value = ui.create_line_edit(name='time_interval_value', width = 100)
+        self.time_interval_value = ui.create_line_edit(name='time_interval_value', width = 50)
 
         self.calib_dim1_label = ui.create_label(name='calib_dim1_label', text='Drift.x (nm/s): ')
         self.calib_dim1_value = ui.create_label(name='calib_dim1_value', text='@binding(drift_u)')
@@ -577,6 +585,27 @@ class View:
         self.second_group = ui.create_group(name='second_group', title='Automatic tracking',
                                             content=ui.create_column(self.second_row, self.third_row, self.fourth_row,
                                                                      self.fifth_row))
+
+        #Manual tracking
+        self.time_interval_manual_label = ui.create_label(text='Time interval (s)', name='time_interval_manual_label')
+        self.time_interval_manual_value = ui.create_line_edit(name='time_interval_manual_value', width=50)
+
+        self.manual_drift_x_label = ui.create_label(name='manual_drift_x_label', text='Manual drift.x (nm/s): ')
+        self.manual_drift_x_value = ui.create_line_edit(name='manual_drift_x_value', width = 50)
+        self.manual_drift_y_label = ui.create_label(name='manual_drift_y_label', text='Manual drift.y (nm/s): ')
+        self.manual_drift_y_value = ui.create_line_edit(name='manual_drift_y_value', width = 50)
+        self.start_manual_pb = ui.create_push_button(name='start_manual_pb', text='Start', on_clicked='start_manual_correction')
+
+        self.manual_x_row = ui.create_row(self.manual_drift_x_label, self.manual_drift_x_value, ui.create_stretch(),
+                                          self.time_interval_manual_label, self.time_interval_manual_value)
+        self.manual_y_row = ui.create_row(self.manual_drift_y_label, self.manual_drift_y_value, ui.create_stretch())
+        self.manual_pb_row = ui.create_row(self.start_manual_pb, ui.create_stretch())
+        self.manual_group = ui.create_group(name = 'manual_group', title='Manual correction', content=ui.create_column(
+            self.manual_x_row,
+            self.manual_y_row,
+            self.manual_pb_row,
+            ui.create_stretch()
+        ))
 
         #Shifters
         self.shifter_dim1_label = ui.create_label(name='shifter_dim1_label', text='Shifter.x: ')
@@ -624,7 +653,8 @@ class View:
 
 
         self.cross_tab = ui.create_tab(label='Drift Correction',
-                                       content=ui.create_column(self.first_group, self.second_group, self.third_group,
+                                       content=ui.create_column(self.first_group, self.second_group, self.manual_group,
+                                                                self.third_group,
                                                                 ui.create_stretch()))
         # End of cross-correlation tab
 
