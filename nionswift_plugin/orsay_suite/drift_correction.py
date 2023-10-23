@@ -78,7 +78,7 @@ class DriftCorrection:
     def abort(self):
         self.__abort = True
 
-    def start(self, callback, scan_system, interval, static_reference, should_correct):
+    def start(self, callback, scan_system, interval, static_reference, should_correct, manual_correction, manual_correction_values):
         self.__scan = HardwareSource.HardwareSourceManager().get_hardware_source_for_hardware_source_id(
             scan_system)
         try:
@@ -92,7 +92,10 @@ class DriftCorrection:
         if self.__scan.is_playing == False:
             logging.info(f'***Drift Correction***: Please activate scan first.')
             return False
-        self.__thread = threading.Thread(target=self.thread_func, args=(callback,))
+        if not manual_correction:
+            self.__thread = threading.Thread(target=self.thread_func, args=(callback,))
+        else:
+            self.__thread = threading.Thread(target=self.thread_manual_func, args=(manual_correction_values,))
         self.__thread.start()
         return True
 
@@ -113,21 +116,21 @@ class DriftCorrection:
     def displace_shifter_relative(self, dimension, value):
         valx, valy = self.get_shifters()
         if dimension == 0:
-            self.__instrument.SetVal('CSH.u', valx + value)
+            self.__instrument.SetVal('CSH.u', valx + value*1e-9)
         elif dimension == 1:
-            self.__instrument.SetVal('CSH.v', valy + value)
+            self.__instrument.SetVal('CSH.v', valy + value*1e-9)
 
     def displace_shifter_absolute(self, dimension, value):
         if dimension == 0:
-            self.__instrument.SetVal('CSH.u', value)
+            self.__instrument.SetVal('CSH.u', value*1e-9)
         elif dimension == 1:
-            self.__instrument.SetVal('CSH.v', value)
+            self.__instrument.SetVal('CSH.v', value*1e-9)
 
     def displace_shifter_reset(self, dimension):
         if dimension == 0:
-            self.__instrument.SetVal('CSH.u', self.__offset_valx)
+            self.__instrument.SetVal('CSH.u', self.__offset_valx*1e-9)
         elif dimension == 1:
-            self.__instrument.SetVal('CSH.v', self.__offset_valy)
+            self.__instrument.SetVal('CSH.v', self.__offset_valy*1e-9)
 
     def set_calibration(self, dimension, value):
         if dimension == 0:
@@ -143,6 +146,17 @@ class DriftCorrection:
         time.sleep(self.__interval)
         if not self.__scan.is_playing:
             self.abort()
+
+
+    def thread_manual_func(self, manual_correction_values):
+        x_val, y_val = manual_correction_values
+        x_val = float(x_val)
+        y_val = float(y_val)
+        while not self.__abort:
+            self.check_and_wait()
+            self.displace_shifter_relative(0, x_val * self.__interval)
+            self.displace_shifter_relative(1, y_val * self.__interval)
+
 
     def thread_func(self, callback):
         reference_image = self.__scan.grab_next_to_finish()
@@ -169,8 +183,8 @@ class DriftCorrection:
                 logging.info(f'***Drift Correction***: Drift.x {xdrift} (nm/s). Drift.y: {ydrift} (nm/s). '
                              f'Interval: {end - start} (s).')
                 if self.__should_correct:
-                    self.__instrument.SetVal('CSH.u', 1.0)
-                    self.__instrument.SetVal('CSH.v', 1.0)
+                    self.__instrument.SetVal('CSH.u', 1.0*1e-9)
+                    self.__instrument.SetVal('CSH.v', 1.0*1e-9)
 
                 callback()
             if not self.__static_reference: reference_image = new_image

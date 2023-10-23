@@ -367,7 +367,7 @@ class handler:
         if 'Measure' in widget.text:
             should_correct = 'Correct' in widget.text
             if not self.__drift.start(self._update_cross_correlation, self.__drift.scan_systems[self.scan_selection_dd.current_index], self.time_interval_value.text,
-                               self.static_reference_pb.checked, should_correct):
+                               self.static_reference_pb.checked, should_correct, False, (self.manual_drift_x_value.text, self.manual_drift_y_value.text)):
                 self.note_label.text = 'Status: Not running (activate scan channel)'
                 return
 
@@ -422,9 +422,22 @@ class handler:
 
     def start_manual_correction(self, widget):
         if widget.text == "Start":
+            if not self.__drift.start(self._update_cross_correlation, self.__drift.scan_systems[self.scan_selection_dd.current_index], self.time_interval_manual_value.text,
+                               self.static_reference_pb.checked, True, True, (self.manual_drift_x_value.text, self.manual_drift_y_value.text)):
+                self.note_manual_label.text = 'Status: Not running (activate scan channel)'
+                return
             widget.text = 'Abort'
+            self.note_manual_label.text = 'Status: Running'
+            self.manual_drift_x_value.enabled = False
+            self.manual_drift_y_value.enabled = False
+            self.time_interval_manual_value.enabled = False
         elif widget.text == 'Abort':
             widget.text = "Start"
+            self.note_manual_label.text = 'Status: Not running'
+            self.manual_drift_x_value.enabled = True
+            self.manual_drift_y_value.enabled = True
+            self.time_interval_manual_value.enabled = True
+            self.__drift.abort()
 
     def reset_shifter(self, widget):
         self.__drift.displace_shifter_reset(0)
@@ -587,6 +600,7 @@ class View:
                                                                      self.fifth_row))
 
         #Manual tracking
+        self.note_manual_label = ui.create_label(name='note_manual_label', text='Status: Not running')
         self.time_interval_manual_label = ui.create_label(text='Time interval (s)', name='time_interval_manual_label')
         self.time_interval_manual_value = ui.create_line_edit(name='time_interval_manual_value', width=50)
 
@@ -599,7 +613,7 @@ class View:
         self.manual_x_row = ui.create_row(self.manual_drift_x_label, self.manual_drift_x_value, ui.create_stretch(),
                                           self.time_interval_manual_label, self.time_interval_manual_value)
         self.manual_y_row = ui.create_row(self.manual_drift_y_label, self.manual_drift_y_value, ui.create_stretch())
-        self.manual_pb_row = ui.create_row(self.start_manual_pb, ui.create_stretch())
+        self.manual_pb_row = ui.create_row(self.start_manual_pb, ui.create_stretch(), self.note_manual_label)
         self.manual_group = ui.create_group(name = 'manual_group', title='Manual correction', content=ui.create_column(
             self.manual_x_row,
             self.manual_y_row,
