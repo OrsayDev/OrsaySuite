@@ -152,13 +152,18 @@ class DriftCorrection:
         x_val, y_val = manual_correction_values
         x_val = float(x_val)
         y_val = float(y_val)
+        time_correction = 0
         while not self.__abort:
+            start = time.time()
             self.check_and_wait()
-            self.displace_shifter_relative(0, x_val * self.__interval)
-            self.displace_shifter_relative(1, y_val * self.__interval)
+            self.displace_shifter_relative(0, x_val * self.__interval + time_correction)
+            self.displace_shifter_relative(1, y_val * self.__interval + time_correction)
+            end = time.time()
+            time_correction = end - start - self.__interval
 
 
     def thread_func(self, callback):
+        time_correction = 0
         reference_image = self.__scan.grab_next_to_finish()
         while not self.__abort:
             start = time.time()
@@ -170,8 +175,8 @@ class DriftCorrection:
                 xindex = int(index % corr.shape[0])
                 yindex = int(index / corr.shape[1])
 
-                xdrift = reference_image[0].get_dimensional_calibration(0).scale / self.__interval * (xindex - int(corr.shape[0]/2))
-                ydrift = reference_image[0].get_dimensional_calibration(1).scale / self.__interval * (yindex - int(corr.shape[1]/2))
+                xdrift = reference_image[0].get_dimensional_calibration(0).scale / (self.__interval + time_correction) * (xindex - int(corr.shape[0]/2))
+                ydrift = reference_image[0].get_dimensional_calibration(1).scale / (self.__interval + time_correction) * (yindex - int(corr.shape[1]/2))
 
                 self.append_to_array(
                     xdrift,
@@ -179,15 +184,16 @@ class DriftCorrection:
                 )
                 #xdrift = reference_image[0].get_dimensional_calibration(0).scale * (xindex - int(corr.shape[0] / 2))
                 #ydrift = reference_image[0].get_dimensional_calibration(1).scale * (xindex - int(corr.shape[1] / 2))
-                end = time.time()
-                logging.info(f'***Drift Correction***: Drift.x {xdrift} (nm/s). Drift.y: {ydrift} (nm/s). '
-                             f'Interval: {end - start} (s).')
+                #logging.info(f'***Drift Correction***: Drift.x {xdrift} (nm/s). Drift.y: {ydrift} (nm/s). '
+                #             f'Interval: {end - start} (s).')
                 if self.__should_correct:
-                    self.__instrument.SetVal('CSH.u', 1.0*1e-9)
-                    self.__instrument.SetVal('CSH.v', 1.0*1e-9)
+                    self.__instrument.SetVal('CSH.u', xdrift * (self.__interval + time_correction) * 1e-9)
+                    self.__instrument.SetVal('CSH.v', ydrift * (self.__interval + time_correction) * 1e-9)
 
                 callback()
             if not self.__static_reference: reference_image = new_image
+            end = time.time()
+            time_correction = end - start - self.__interval
 
 
 
