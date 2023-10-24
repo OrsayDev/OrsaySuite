@@ -107,9 +107,6 @@ class DriftCorrection:
         else:
             self.__array_index = self.__array_index + 1
 
-    def get_last_value(self):
-        return (self.datax[self.__array_index], self.datay[self.__array_index])
-
     def get_shifters(self):
         return (self.__instrument.TryGetVal('CSH.u')[1], self.__instrument.TryGetVal('CSH.v')[1])
 
@@ -187,12 +184,16 @@ class DriftCorrection:
                 #logging.info(f'***Drift Correction***: Drift.x {xdrift} (nm/s). Drift.y: {ydrift} (nm/s). '
                 #             f'Interval: {end - start} (s).')
                 if self.__should_correct:
-                    self.__instrument.SetVal('CSH.u', xdrift * (self.__interval + time_correction) * 1e-9)
-                    self.__instrument.SetVal('CSH.v', ydrift * (self.__interval + time_correction) * 1e-9)
+                    self.displace_shifter_relative(0, - 0.5 * xdrift * (self.__interval + time_correction))
+                    self.displace_shifter_relative(1, - 0.5 * ydrift * (self.__interval + time_correction))
 
                 callback()
-            if not self.__static_reference: reference_image = new_image
+            if not self.__static_reference:
+                logging.info(f'new reference image')
+                reference_image = new_image
             end = time.time()
+            logging.info(f'***Drift Correction***: Drift.x {xdrift} (nm/s). Drift.y: {ydrift} (nm/s). '
+                         f'Interval: {end - start} (s).')
             time_correction = end - start - self.__interval
 
 

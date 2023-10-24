@@ -71,6 +71,7 @@ class handler:
         self.E_le.text = '1'
         self.comp_le.text = '3'
         self.int_le.text = '10'
+        self.static_reference_pb.checked = True
         self.time_interval_value.text = '2'
         self.time_interval_manual_value.text = '2'
         self.calib_shifter_dim1_value.text = '1.0'
@@ -415,10 +416,10 @@ class handler:
     def displace_shifter(self, widget):
         if widget.text == 'Displace X':
             self.__drift.displace_shifter_relative(0, float(self.calib_shifter_dim1_value.text))
-            self.property_changed_event.fire("shifter_u")
         if widget.text == 'Displace Y':
             self.__drift.displace_shifter_relative(1, float(self.calib_shifter_dim2_value.text))
-            self.property_changed_event.fire("shifter_v")
+        self.property_changed_event.fire("shifter_u")
+        self.property_changed_event.fire("shifter_v")
 
     def start_manual_correction(self, widget):
         if widget.text == "Start":
@@ -456,30 +457,21 @@ class handler:
         self.property_changed_event.fire("shifter_u_calib")
         self.property_changed_event.fire("shifter_v_calib")
 
-
-    @property
-    def drift_u(self):
-        return self.__drift.get_last_value()[0]
-
-    @property
-    def drift_v(self):
-        return self.__drift.get_last_value()[1]
-
     @property
     def shifter_u(self):
-        return self.__drift.get_shifters()[0]
+        return round(self.__drift.get_shifters()[0]*1e9, 3)
 
     @property
     def shifter_v(self):
-        return self.__drift.get_shifters()[1]
+        return round(self.__drift.get_shifters()[1]*1e9, 3)
 
     @property
     def shifter_u_calib(self):
-        return self.__drift.shifter_calibration['calib.x']
+        return round(self.__drift.shifter_calibration['calib.x']*1e9, 3)
 
     @property
     def shifter_v_calib(self):
-        return self.__drift.shifter_calibration['calib.y']
+        return round(self.__drift.shifter_calibration['calib.y']*1e9, 3)
 
 class View:
 
@@ -582,21 +574,14 @@ class View:
         self.time_interval_label = ui.create_label(text='Time interval (s)', name ='time_interval_label')
         self.time_interval_value = ui.create_line_edit(name='time_interval_value', width = 50)
 
-        self.calib_dim1_label = ui.create_label(name='calib_dim1_label', text='Drift.x (nm/s): ')
-        self.calib_dim1_value = ui.create_label(name='calib_dim1_value', text='@binding(drift_u)')
-        self.calib_dim2_label = ui.create_label(name='calib_dim2_label', text='Drift.y (nm/s): ')
-        self.calib_dim2_value = ui.create_label(name='calib_dim2_value', text='@binding(drift_v)')
-
         self.note_label = ui.create_label(name='note_label', text='Status: Not running')
 
 
         self.second_row = ui.create_row(self.static_reference_pb, ui.create_stretch(), self.time_interval_label,
                                         self.time_interval_value, name='second_row')
-        self.third_row = ui.create_row(self.calib_dim1_label, self.calib_dim1_value, ui.create_stretch())
-        self.fourth_row = ui.create_row(self.calib_dim2_label, self.calib_dim2_value, ui.create_stretch())
         self.fifth_row = ui.create_row(self.act_corr_pushb, self.act_meas_corr_pushb, ui.create_stretch(), self.note_label)
         self.second_group = ui.create_group(name='second_group', title='Automatic tracking',
-                                            content=ui.create_column(self.second_row, self.third_row, self.fourth_row,
+                                            content=ui.create_column(self.second_row,
                                                                      self.fifth_row))
 
         #Manual tracking
