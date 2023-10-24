@@ -330,9 +330,21 @@ class handler:
         self.__current_DI = self._pick_di()
         if self.__current_DI:
             self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)  # hspec
-            var, new_di = self.gd.signal_decomposition(components=val, mask=False)
+            var, new_di, factors, loadings_stacked = self.gd.signal_decomposition(components=val, mask=False)
             self.event_loop.create_task(self.data_item_show(new_di))
             self.event_loop.create_task(self.data_item_show(var))
+            self.event_loop.create_task(self.data_item_show(factors))
+            self.event_loop.create_task(self.data_item_show(loadings_stacked))
+
+            """
+            factors_np = numpy.copy(factors.data)
+            for i in range(val):
+                factor = factors_np[:, i]
+                factor_hs = orsay_data.HspySignal1D(factor)
+                #self._get_data(factor_hs, 'PCA_factors'+str(i)+'_'),
+                self.event_loop.create_task(self.data_item_show(factor_hs))
+                #self.event_loop.create_task(self.data_item_show(loadings))
+            """
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 

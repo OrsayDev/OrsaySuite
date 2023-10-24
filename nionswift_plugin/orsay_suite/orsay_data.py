@@ -78,7 +78,7 @@ class HspySignal1D:
     def get_axes_units_all(self):
         return [self.hspy_gd.axes_manager[index].units for index in range(len(self.hspy_gd.data.shape))]
 
-    def _get_data(self, temp_data, prefix):
+    def _get_data(self, temp_data, prefix, is_sequence = False, collection_dimension = None, datum_dimension = None):
         timezone = Utility.get_local_timezone()
         timezone_offset = Utility.TimezoneMinutesToStringConverter().convert(Utility.local_utcoffset_minutes())
         calibration = Calibration.Calibration()
@@ -88,7 +88,12 @@ class HspySignal1D:
             dimensional_calibrations[index].scale = temp_data.axes_manager[index].scale
             dimensional_calibrations[index].units = temp_data.axes_manager[index].units
 
+        if collection_dimension == None or datum_dimension == None:
+            data_descriptor = None
+        else:
+            data_descriptor = DataAndMetadata.DataDescriptor(is_sequence, collection_dimension, datum_dimension)
         xdata = DataAndMetadata.new_data_and_metadata(temp_data.data, calibration, dimensional_calibrations,
+                                                      data_descriptor=data_descriptor,
                                                       metadata=self.di.metadata,
                                                       timezone=timezone, timezone_offset=timezone_offset)
         data_item = DataItem.DataItem()
@@ -175,12 +180,38 @@ class HspySignal1D:
             signal_mask2.isig[r1: r2] = True
             self.hspy_gd.decomposition(True, svd_solver='full', signal_mask=signal_mask2)
         else:
-            self.hspy_gd.decomposition(True, svd_solver='full')
+            self.hspy_gd.decomposition(True)  # , svd_solver = 'full')
 
         variance = self.hspy_gd.get_explained_variance_ratio()
         spim_dec = self.hspy_gd.get_decomposition_model(components)
+        factors = hs.signals.Signal1D(self.hspy_gd.learning_results.factors[:, :components].reshape(components, self.signal_size))
+        shape_loading = self.hspy_gd.axes_manager._navigation_shape_in_array
+        loadings_stacked = hs.signals.Signal1D(
+            self.hspy_gd.learning_results.loadings[:, :components].reshape(shape_loading[0], shape_loading[1], components).transpose())
 
-        return [self._get_data(variance, 'PCAvar'+str(components)+'_'), self._get_data(spim_dec, 'PCA'+str(components)+'_')]
+        # Calibrate factors
+        factors.axes_manager[1].name = "Energy"
+        factors.axes_manager[1].scale = self.hspy_gd.axes_manager[2].scale
+        factors.axes_manager[1].offset = self.hspy_gd.axes_manager[2].offset
+        factors.axes_manager[1].units = self.hspy_gd.axes_manager[2].units
+
+        # Calibrate loadings
+        loadings_stacked.axes_manager[1].name = "Width"
+        loadings_stacked.axes_manager[1].scale = self.hspy_gd.axes_manager[0].scale
+        loadings_stacked.axes_manager[1].offset = self.hspy_gd.axes_manager[0].offset
+        loadings_stacked.axes_manager[1].units = self.hspy_gd.axes_manager[0].units
+
+        loadings_stacked.axes_manager[2].name = "Height"
+        loadings_stacked.axes_manager[2].scale = self.hspy_gd.axes_manager[1].scale
+        loadings_stacked.axes_manager[2].offset = self.hspy_gd.axes_manager[1].offset
+        loadings_stacked.axes_manager[2].units = self.hspy_gd.axes_manager[1].units
+
+        return [
+            self._get_data(variance, 'PCAvar' + str(components) + '_'),
+            self._get_data(spim_dec, 'PCA_SpimFiltered' + str(components) + '_'),
+            self._get_data(factors, 'PCA_factors' + str(components) + '_', is_sequence=True, collection_dimension=0, datum_dimension=1),
+            self._get_data(loadings_stacked, 'PCA_loadings' + str(components) + '_', is_sequence=True, collection_dimension=0, datum_dimension=2)
+        ]
 
     def _rel_to_abs(self, val):
         return self.signal_calib.offset + val*self.signal_calib.scale*self.signal_size
