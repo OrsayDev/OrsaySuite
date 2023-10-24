@@ -182,9 +182,9 @@ class HspySignal1D:
         else:
             self.hspy_gd.decomposition(True)  # , svd_solver = 'full')
 
-        variance = self.hspy_gd.get_explained_variance_ratio()
+        variance = self.hspy_gd.get_explained_variance_ratio().isig[0:50]
         spim_dec = self.hspy_gd.get_decomposition_model(components)
-        factors = hs.signals.Signal1D(self.hspy_gd.learning_results.factors[:, :components].reshape(components, self.signal_size))
+        factors = hs.signals.Signal1D(self.hspy_gd.learning_results.factors[:, :components].reshape(self.signal_size, components).transpose())
         shape_loading = self.hspy_gd.axes_manager._navigation_shape_in_array
         loadings_stacked = hs.signals.Signal1D(
             self.hspy_gd.learning_results.loadings[:, :components].reshape(shape_loading[0], shape_loading[1], components).transpose())

@@ -63,6 +63,7 @@ class handler:
         self.__drift = drift_correction.DriftCorrection()
         self.__crossx_di = None
         self.__crossy_di = None
+        self.__cross_fft = None
 
     def init_handler(self):
         self.event_loop.create_task(self.do_enable(True, ['']))
@@ -72,6 +73,7 @@ class handler:
         self.comp_le.text = '3'
         self.int_le.text = '10'
         self.static_reference_pb.checked = True
+        self.display_fft_pb.checked = False
         self.time_interval_value.text = '2'
         self.time_interval_manual_value.text = '2'
         self.calib_shifter_dim1_value.text = '1.0'
@@ -401,6 +403,13 @@ class handler:
                 self.__crossy_di = DataItemCreation('YDrift', self.__drift.datay, 1, [0], [1], ['Time interval'])
                 self.__crossy_di.data_item._enter_live_state()
                 self.event_loop.create_task(self.data_item_show(self.__crossy_di.data_item))
+
+            self.__fft_show = self.display_fft_pb.checked
+            if self.__cross_fft == None and self.__fft_show:
+                self.__cross_fft = DataItemCreation('FFT Cross', self.__drift.cross_fft, 2, [0, 0], [1, 1], ['1/nm', '1/nm'])
+                self.__cross_fft.data_item._enter_live_state()
+                self.event_loop.create_task(self.data_item_show(self.__cross_fft.data_item))
+
         elif widget.text == 'Abort':
             self.act_meas_corr_pushb.enabled = True
             self.note_label.text = 'Status: Not running'
@@ -415,15 +424,13 @@ class handler:
             self.__drift.abort()
 
     def _update_cross_correlation(self):
-        try:
-            self.__crossx_di.update_data_only(self.__drift.datax)
-            self.__crossy_di.update_data_only(self.__drift.datay)
-            self.property_changed_event.fire("drift_u")
-            self.property_changed_event.fire("drift_v")
-            self.property_changed_event.fire("shifter_u")
-            self.property_changed_event.fire("shifter_v")
-        except:
-            pass
+        self.__crossx_di.update_data_only(self.__drift.datax)
+        self.__crossy_di.update_data_only(self.__drift.datay)
+        if self.__fft_show: self.__cross_fft.update_data_only(self.__drift.cross_fft)
+        self.property_changed_event.fire("drift_u")
+        self.property_changed_event.fire("drift_v")
+        self.property_changed_event.fire("shifter_u")
+        self.property_changed_event.fire("shifter_v")
 
     def displace_shifter(self, widget):
         if widget.text == 'Displace X':
@@ -583,13 +590,15 @@ class View:
         self.act_meas_corr_pushb = ui.create_push_button(name='act_meas_corr_pushb', text='Measure &&& Correct',
                                                     on_clicked='activate_cross_correlation')
         self.static_reference_pb = ui.create_check_box(text='Static reference', name='static_reference_pb')
+        self.display_fft_pb = ui.create_check_box(text='Display FFT', name='display_fft_pb')
         self.time_interval_label = ui.create_label(text='Time interval (s)', name ='time_interval_label')
         self.time_interval_value = ui.create_line_edit(name='time_interval_value', width = 50)
 
         self.note_label = ui.create_label(name='note_label', text='Status: Not running')
 
 
-        self.second_row = ui.create_row(self.static_reference_pb, ui.create_stretch(), self.time_interval_label,
+        self.second_row = ui.create_row(self.static_reference_pb, ui.create_spacing(10), self.display_fft_pb,
+                                        ui.create_stretch(), self.time_interval_label,
                                         self.time_interval_value, name='second_row')
         self.fifth_row = ui.create_row(self.act_corr_pushb, self.act_meas_corr_pushb, ui.create_stretch(), self.note_label)
         self.second_group = ui.create_group(name='second_group', title='Automatic tracking',

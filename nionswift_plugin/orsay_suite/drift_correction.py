@@ -13,6 +13,7 @@ class DriftCorrection:
         self.__abort = False
         self.datax = numpy.zeros(100)
         self.datay = numpy.zeros(100)
+        self.cross_fft = numpy.zeros((256, 256))
         self.scan_systems = list()
         self.__array_index = 0
         self.__interval = 2
@@ -141,8 +142,8 @@ class DriftCorrection:
 
     def check_and_wait(self):
         time.sleep(self.__interval)
-        if not self.__scan.is_playing:
-            self.abort()
+        #if not self.__scan.is_playing:
+        #    self.abort()
 
 
     def thread_manual_func(self, manual_correction_values):
@@ -167,13 +168,13 @@ class DriftCorrection:
             self.check_and_wait()
             new_image = self.__scan.grab_next_to_finish()
             if reference_image[0].data.shape == new_image[0].data.shape: #Should correct
-                corr = signal.correlate(reference_image[0].data, new_image[0].data, method = 'fft')
-                index = numpy.argmax(corr)
-                xindex = int(index % corr.shape[0])
-                yindex = int(index / corr.shape[1])
+                self.cross_fft = signal.correlate(reference_image[0].data, new_image[0].data, method = 'fft')
+                index = numpy.argmax(self.cross_fft)
+                xindex = int(index % self.cross_fft.shape[0])
+                yindex = int(index / self.cross_fft.shape[1])
 
-                xdrift = reference_image[0].get_dimensional_calibration(0).scale / (self.__interval + time_correction) * (xindex - int(corr.shape[0]/2))
-                ydrift = reference_image[0].get_dimensional_calibration(1).scale / (self.__interval + time_correction) * (yindex - int(corr.shape[1]/2))
+                xdrift = reference_image[0].get_dimensional_calibration(0).scale / (self.__interval + time_correction) * (xindex - int(self.cross_fft.shape[0]/2))
+                ydrift = reference_image[0].get_dimensional_calibration(1).scale / (self.__interval + time_correction) * (yindex - int(self.cross_fft.shape[1]/2))
 
                 self.append_to_array(
                     xdrift,
