@@ -394,6 +394,7 @@ class handler:
                 self.act_meas_corr_pushb.enabled = False
             self.note_label.text = 'Status: Running'
             self.second_row.enabled = False
+
             if self.__crossx_di == None:
                 self.__crossx_di = DataItemCreation('XDrift', self.__drift.datax, 1, [0], [1], ['Time interval'])
                 self.event_loop.create_task(self.data_item_show(self.__crossx_di.data_item))
@@ -406,7 +407,7 @@ class handler:
 
             self.__fft_show = self.display_fft_pb.checked
             if self.__cross_fft == None and self.__fft_show:
-                self.__cross_fft = DataItemCreation('FFT Cross', self.__drift.cross_fft, 2, [0, 0], [1, 1], ['1/nm', '1/nm'])
+                self.__cross_fft = DataItemCreation('FFT Cross', self.__drift.cross_fft, 2, [-256, -256], [1, 1], ['arb. units', 'arb. units'])
                 self.__cross_fft.data_item._enter_live_state()
                 self.event_loop.create_task(self.data_item_show(self.__cross_fft.data_item))
 

@@ -185,8 +185,8 @@ class DriftCorrection:
                 #logging.info(f'***Drift Correction***: Drift.x {xdrift} (nm/s). Drift.y: {ydrift} (nm/s). '
                 #             f'Interval: {end - start} (s).')
                 if self.__should_correct:
-                    self.displace_shifter_relative(0, - 0.5 * xdrift * (self.__interval + time_correction))
-                    self.displace_shifter_relative(1, - 0.5 * ydrift * (self.__interval + time_correction))
+                    self.displace_shifter_relative(0, - 0.8 * xdrift * (self.__interval + time_correction))
+                    self.displace_shifter_relative(1, - 0.8 * ydrift * (self.__interval + time_correction))
 
                 callback()
             if not self.__static_reference:
