@@ -121,18 +121,6 @@ class handler:
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
-    # def correct_junctions(self, widget):
-    #     self.__current_DI = None
-    #
-    #     self.__current_DI = self._pick_di()
-    #
-    #     if self.__current_DI:
-    #         self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
-    #         corrected_data = self.gd.detector_junctions()
-    #         self.event_loop.create_task(self.data_item_show(corrected_data))
-    #     else:
-    #         logging.info('***PANEL***: Could not find referenced Data Item.')
-
     def correct_gain(self, widget):
         #Not yet implemented. Needs ROI and threshold in metadata
         self.__current_DI = None
@@ -158,31 +146,6 @@ class handler:
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
-    # def flip_signal(self, widget):
-    #     self.__current_DI = None
-    #
-    #     self.__current_DI = self._pick_di()
-    #
-    #     if self.__current_DI:
-    #         self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
-    #         self.gd.flip()
-    #         self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
-
-    # def _align_chrono(self, align=True, bin=False):
-    #     self.__current_DI = None
-    #
-    #     self.__current_DI = self._pick_di()
-    #
-    #     if self.__current_DI:
-    #         self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
-    #         if align: self.gd.align_zlp()
-    #         if bin:
-    #             self.event_loop.create_task(self.data_item_show(self.gd.get_di(sum_inav=True)))
-    #         else:
-    #             self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
-    #     else:
-    #         logging.info('***PANEL***: Could not find referenced Data Item.')
-
     def gain_profile_data_item(self, widget):
         self.__current_DI = None
 
@@ -205,32 +168,6 @@ class handler:
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
-    # def deconvolve_rl_hspec(self, widget):
-    #     try:
-    #         val = int(self.int_le.text)
-    #     except ValueError:
-    #         logging.info("***PANEL***: Interaction value must be integer.")
-    #     self._deconvolve_hspec('Richardson lucy', val)
-    #
-    # def _deconvolve_hspec(self, type, interactions):
-    #     self.__current_DI = None
-    #
-    #     self.__current_DI = self._pick_di()
-    #
-    #     if self.__current_DI:
-    #         logging.info('***PANEL***: Must select to spectra for deconvolution.')
-    #     else:
-    #         dis = self._pick_dis()  # Multiple data items
-    #         val_spec = list()
-    #         if dis and len(dis) == 2:
-    #             self.gd = orsay_data.HspySignal1D(dis[0].data_item)  # hspec
-    #             self.spec_gd = orsay_data.HspySignal1D(dis[1].data_item) #spec
-    #             new_di = self.gd.deconvolution(self.spec_gd, type, interactions)
-    #             self.event_loop.create_task(self.data_item_show(new_di))
-    #         else:
-    #             logging.info('***PANEL***: Could not find referenced Data Item.')
-
-
     def _general_actions(self, type, which):
         self.__current_DI = None
 
@@ -240,12 +177,19 @@ class handler:
             corrected_data = hspy_signal.detector_junctions()
             self.event_loop.create_task(self.data_item_show(corrected_data))
 
-        def align_zlp_action(hspy_signal, interval):
-            hspy_signal.align_zlp_signal_range(interval)
-            self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
-
         def flip_signal(hspy_signal):
             hspy_signal.flip()
+            self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
+
+        def data_bin(hspy_signal):
+            x = int(self.x_le.text)
+            y = int(self.y_le.text)
+            E = int(self.E_le.text)
+            hspy_signal.rebin(scale=[x, y, E])
+            self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
+
+        def align_zlp_action(hspy_signal, interval):
+            hspy_signal.align_zlp_signal_range(interval)
             self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
 
         def fitting_action(hspy_signal, interval):
@@ -262,7 +206,7 @@ class handler:
         def deconvolve_hyperspec(hspy_signal, reference_spec):
             if which == 'rl':
                 new_di = hspy_signal.deconvolution(reference_spec, 'Richardson lucy', int(self.int_le.text))
-                self.event_loop.create_task(self.data_item_show(new_di))
+            self.event_loop.create_task(self.data_item_show(new_di))
 
         def decomposition_action(hspy_signal, *args):
             if which == 'pca_mask':
@@ -277,10 +221,6 @@ class handler:
             self.event_loop.create_task(self.data_item_show(var))
             self.event_loop.create_task(self.data_item_show(factors))
             self.event_loop.create_task(self.data_item_show(loadings_stacked))
-            #var, new_di = hspy_signal.signal_decomposition(interval, which)
-            #self.event_loop.create_task(self.data_item_show(new_di))
-            #self.event_loop.create_task(self.data_item_show(var))
-
 
         if type == 'fitting':
             action = fitting_action
@@ -296,6 +236,8 @@ class handler:
             action = flip_signal
         elif type == 'deconvolve':
             action = deconvolve_hyperspec
+        elif type == 'data_bin':
+            action = data_bin
         else:
             raise Exception("***PANEL***: No action function was selected. Please check the correct type.")
 
@@ -303,8 +245,6 @@ class handler:
             self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
             for graphic in self.__current_DI.graphics:
                 if graphic.type == 'rect-graphic':  # This is a hyperspectral image
-                    #logging.info('***PANEL***: Hyperspectrum selected. If you wish to perform this action, please select two '
-                    #             'data items.')
                     action(self.gd)
                 if graphic.type == 'line-profile-graphic':  # This is Chrono
                     val = (graphic.start[1], graphic.end[1])
@@ -315,18 +255,23 @@ class handler:
                     action(self.gd, val)
         else:
             dis = self._pick_dis()  # Multiple data items
-            val_spec = list()
+            interval_spec = list()
             if dis and len(dis) == 2:
                 spec = dis[1]
                 hspec = dis[0]
                 for graphic in spec.graphics:
                     if graphic.type == 'interval-graphic':
-                        val_spec = graphic.interval
+                        interval_spec = graphic.interval
                 for graphic in hspec.graphics:
-                    if graphic.type == 'rect-graphic' and len(val_spec) == 2:
+                    if graphic.type == 'rect-graphic' and len(interval_spec) == 2: #interval_spec is an interval
                         self.gd = orsay_data.HspySignal1D(hspec.data_item)
-                        action(self.gd, val_spec)
+                        action(self.gd, interval_spec)
                         return
+                    #If there is no interval, pass the reference spectrum entirely
+                    self.gd = orsay_data.HspySignal1D(hspec.data_item)
+                    ref_spec = orsay_data.HspySignal1D(spec.data_item)
+                    action(self.gd, ref_spec)
+                    return
             else:
                 logging.info('***PANEL***: Could not find referenced Data Item.')
 
@@ -357,62 +302,8 @@ class handler:
     def pca(self, widget):
         self._general_actions('decomposition', 'pca')
 
-    # def pca(self, widget):
-    #     try:
-    #         val = int(self.comp_le.text)
-    #     except ValueError:
-    #         logging.info("***PANEL***: Interaction value must be integer.")
-    #     self._general_actions('decomposition', val)
-    #
-    #
-    # def pca_full(self, widget):
-    #     self._pca_full()
-    #
-    # def _pca_full(self):
-    #     try:
-    #         val = int(self.comp_le.text)
-    #     except ValueError:
-    #         logging.info("***PANEL***: Components value must be integer.")
-    #     self.__current_DI = self._pick_di()
-    #     if self.__current_DI:
-    #         self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)  # hspec
-    #         var, new_di, factors, loadings_stacked = self.gd.signal_decomposition(components=val, mask=False)
-    #         self.event_loop.create_task(self.data_item_show(new_di))
-    #         self.event_loop.create_task(self.data_item_show(var))
-    #         self.event_loop.create_task(self.data_item_show(factors))
-    #         self.event_loop.create_task(self.data_item_show(loadings_stacked))
-    #
-    #         """
-    #         factors_np = numpy.copy(factors.data)
-    #         for i in range(val):
-    #             factor = factors_np[:, i]
-    #             factor_hs = orsay_data.HspySignal1D(factor)
-    #             #self._get_data(factor_hs, 'PCA_factors'+str(i)+'_'),
-    #             self.event_loop.create_task(self.data_item_show(factor_hs))
-    #             #self.event_loop.create_task(self.data_item_show(loadings))
-    #         """
-    #     else:
-    #         logging.info('***PANEL***: Could not find referenced Data Item.')
-
     def hspy_bin(self, widget):
-        try:
-            x = int(self.x_le.text)
-            y = int(self.y_le.text)
-            E = int(self.E_le.text)
-
-            self.__current_DI = None
-
-            self.__current_DI = self._pick_di()
-
-            if self.__current_DI:
-                self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
-                self.gd.rebin(scale=[x, y, E])
-                self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
-            else:
-                logging.info('***PANEL***: Could not find referenced Data Item.')
-
-        except ValueError:
-            logging.info("***PANEL***: Bin values must be integers.")
+        self._general_actions('data_bin', 'None')
 
     def _pick_di(self):
         display_item = self.document_controller.selected_display_item
