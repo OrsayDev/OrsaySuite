@@ -410,17 +410,6 @@ class handler:
         self.property_changed_event.fire("shifter_u")
         self.property_changed_event.fire("shifter_v")
 
-    def set_calibration(self, widget):
-        if widget.text == 'Ok 100 nm X':
-            dim = 0
-            value = self.shifter_u
-        elif widget.text == 'Ok 100 nm Y':
-            dim = 1
-            value = self.shifter_v
-        self.__drift.set_calibration(dim, value)
-        self.property_changed_event.fire("shifter_u_calib")
-        self.property_changed_event.fire("shifter_v_calib")
-
     @property
     def shifter_u(self):
         return round(self.__drift.get_shifters()[0]*1e9, 3)
@@ -428,14 +417,6 @@ class handler:
     @property
     def shifter_v(self):
         return round(self.__drift.get_shifters()[1]*1e9, 3)
-
-    @property
-    def shifter_u_calib(self):
-        return round(self.__drift.shifter_calibration['calib.x']*1e9, 3)
-
-    @property
-    def shifter_v_calib(self):
-        return round(self.__drift.shifter_calibration['calib.y']*1e9, 3)
 
 class View:
 
@@ -575,18 +556,12 @@ class View:
         #Shifters
         self.shifter_dim1_label = ui.create_label(name='shifter_dim1_label', text='Shifter.x: ')
         self.shifter_dim1_value = ui.create_label(name='shifter_dim1_value', text='@binding(shifter_u)')
-        self.shifter_dim1_calib_label = ui.create_label(name='shifter_dim1_calib_label', text='Shifter.x (100 nm): ')
-        self.shifter_dim1_calib_value = ui.create_label(name='shifter_dim1_calib_value', text='@binding(shifter_u_calib)')
 
         self.shifter_dim2_label = ui.create_label(name='shifter_dim2_label', text='Shifter.y: ')
         self.shifter_dim2_value = ui.create_label(name='shifter_dim2_value', text='@binding(shifter_v)')
-        self.shifter_dim2_calib_label = ui.create_label(name='shifter_dim2_calib_label', text='Shifter.y (100 nm): ')
-        self.shifter_dim2_calib_value = ui.create_label(name='shifter_dim2_calib_value', text='@binding(shifter_v_calib)')
 
-        self.shifter_dim1_row = ui.create_row(self.shifter_dim1_label, self.shifter_dim1_value, ui.create_spacing(100),
-                                              self.shifter_dim1_calib_label, self.shifter_dim1_calib_value, ui.create_stretch())
-        self.shifter_dim2_row = ui.create_row(self.shifter_dim2_label, self.shifter_dim2_value, ui.create_spacing(100),
-                                              self.shifter_dim2_calib_label, self.shifter_dim2_calib_value, ui.create_stretch())
+        self.shifter_dim1_row = ui.create_row(self.shifter_dim1_label, self.shifter_dim1_value, ui.create_stretch())
+        self.shifter_dim2_row = ui.create_row(self.shifter_dim2_label, self.shifter_dim2_value, ui.create_stretch())
 
         self.calib_shifter_dim1_label = ui.create_label(name = 'calib_shifter_dim1_label', text='Shiter.x step: ')
         self.calib_shifter_dim1_value = ui.create_line_edit(name='calib_shifter_dim1_value', width=50)
@@ -596,20 +571,15 @@ class View:
                                                ui.create_stretch(),
                                                self.calib_shifter_dim2_label, self.calib_shifter_dim2_value)
 
-        self.calib_dim1_pb = ui.create_push_button(name='calib_dim1_pb', text='Displace X',
+        self.displace_dim1_pb = ui.create_push_button(name='calib_dim1_pb', text='Displace X',
                                                    on_clicked='displace_shifter')
-        self.calib_dim2_pb = ui.create_push_button(name='calib_dim1_pb', text='Displace Y',
+        self.displace_dim2_pb = ui.create_push_button(name='calib_dim1_pb', text='Displace Y',
                                                    on_clicked='displace_shifter')
-        self.calib_reset_pb = ui.create_push_button(name='calib_reset_pb', text='Reset Shifter',
+        self.displace_reset_pb = ui.create_push_button(name='calib_reset_pb', text='Reset Shifter',
                                                    on_clicked='reset_shifter')
 
-        self.shifter_dim1_pb = ui.create_push_button(name='shifter_dim1_pb', text='Ok 100 nm X',
-                                                     on_clicked='set_calibration')
-        self.shifter_dim2_pb = ui.create_push_button(name='shifter_dim2_pb', text='Ok 100 nm Y',
-                                                     on_clicked='set_calibration')
-
-        self.calib_dim_row = ui.create_row(self.calib_dim1_pb, self.shifter_dim1_pb, ui.create_stretch(), self.calib_reset_pb,
-                                           ui.create_stretch(), self.calib_dim2_pb, self.shifter_dim2_pb)
+        self.calib_dim_row = ui.create_row(self.displace_dim1_pb, ui.create_stretch(), self.displace_reset_pb,
+                                           ui.create_stretch(), self.displace_dim2_pb)
 
         self.third_group = ui.create_group(name='third_group', title='Shifters',
                                             content=ui.create_column(self.shifter_dim1_row, self.shifter_dim2_row,
