@@ -121,17 +121,17 @@ class handler:
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
-    def correct_junctions(self, widget):
-        self.__current_DI = None
-
-        self.__current_DI = self._pick_di()
-
-        if self.__current_DI:
-            self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
-            corrected_data = self.gd.detector_junctions()
-            self.event_loop.create_task(self.data_item_show(corrected_data))
-        else:
-            logging.info('***PANEL***: Could not find referenced Data Item.')
+    # def correct_junctions(self, widget):
+    #     self.__current_DI = None
+    #
+    #     self.__current_DI = self._pick_di()
+    #
+    #     if self.__current_DI:
+    #         self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
+    #         corrected_data = self.gd.detector_junctions()
+    #         self.event_loop.create_task(self.data_item_show(corrected_data))
+    #     else:
+    #         logging.info('***PANEL***: Could not find referenced Data Item.')
 
     def correct_gain(self, widget):
         #Not yet implemented. Needs ROI and threshold in metadata
@@ -158,30 +158,30 @@ class handler:
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
-    def flip_signal(self, widget):
-        self.__current_DI = None
+    # def flip_signal(self, widget):
+    #     self.__current_DI = None
+    #
+    #     self.__current_DI = self._pick_di()
+    #
+    #     if self.__current_DI:
+    #         self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
+    #         self.gd.flip()
+    #         self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
 
-        self.__current_DI = self._pick_di()
-
-        if self.__current_DI:
-            self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
-            self.gd.flip()
-            self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
-
-    def _align_chrono(self, align=True, bin=False):
-        self.__current_DI = None
-
-        self.__current_DI = self._pick_di()
-
-        if self.__current_DI:
-            self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
-            if align: self.gd.align_zlp()
-            if bin:
-                self.event_loop.create_task(self.data_item_show(self.gd.get_di(sum_inav=True)))
-            else:
-                self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
-        else:
-            logging.info('***PANEL***: Could not find referenced Data Item.')
+    # def _align_chrono(self, align=True, bin=False):
+    #     self.__current_DI = None
+    #
+    #     self.__current_DI = self._pick_di()
+    #
+    #     if self.__current_DI:
+    #         self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
+    #         if align: self.gd.align_zlp()
+    #         if bin:
+    #             self.event_loop.create_task(self.data_item_show(self.gd.get_di(sum_inav=True)))
+    #         else:
+    #             self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
+    #     else:
+    #         logging.info('***PANEL***: Could not find referenced Data Item.')
 
     def gain_profile_data_item(self, widget):
         self.__current_DI = None
@@ -205,53 +205,65 @@ class handler:
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
-    def deconvolve_rl_hspec(self, widget):
-        try:
-            val = int(self.int_le.text)
-        except ValueError:
-            logging.info("***PANEL***: Interaction value must be integer.")
-        self._deconvolve_hspec('Richardson lucy', val)
-
-    def _deconvolve_hspec(self, type, interactions):
-        self.__current_DI = None
-
-        self.__current_DI = self._pick_di()
-
-        if self.__current_DI:
-            logging.info('***PANEL***: Must select to spectra for deconvolution.')
-        else:
-            dis = self._pick_dis()  # Multiple data items
-            val_spec = list()
-            if dis and len(dis) == 2:
-                self.gd = orsay_data.HspySignal1D(dis[0].data_item)  # hspec
-                self.spec_gd = orsay_data.HspySignal1D(dis[1].data_item) #spec
-                new_di = self.gd.deconvolution(self.spec_gd, type, interactions)
-                self.event_loop.create_task(self.data_item_show(new_di))
-            else:
-                logging.info('***PANEL***: Could not find referenced Data Item.')
+    # def deconvolve_rl_hspec(self, widget):
+    #     try:
+    #         val = int(self.int_le.text)
+    #     except ValueError:
+    #         logging.info("***PANEL***: Interaction value must be integer.")
+    #     self._deconvolve_hspec('Richardson lucy', val)
+    #
+    # def _deconvolve_hspec(self, type, interactions):
+    #     self.__current_DI = None
+    #
+    #     self.__current_DI = self._pick_di()
+    #
+    #     if self.__current_DI:
+    #         logging.info('***PANEL***: Must select to spectra for deconvolution.')
+    #     else:
+    #         dis = self._pick_dis()  # Multiple data items
+    #         val_spec = list()
+    #         if dis and len(dis) == 2:
+    #             self.gd = orsay_data.HspySignal1D(dis[0].data_item)  # hspec
+    #             self.spec_gd = orsay_data.HspySignal1D(dis[1].data_item) #spec
+    #             new_di = self.gd.deconvolution(self.spec_gd, type, interactions)
+    #             self.event_loop.create_task(self.data_item_show(new_di))
+    #         else:
+    #             logging.info('***PANEL***: Could not find referenced Data Item.')
 
 
     def _general_actions(self, type, which):
         self.__current_DI = None
 
-        self.__current_DI = self._pick_di()
+        self.__current_DI = self._pick_di() #Single Data Item here
 
-        def align_zlp_action(hspy_signal, val):
+        def correct_junction(hspy_signal, *args):
+            corrected_data = hspy_signal.detector_junctions()
+            self.event_loop.create_task(self.data_item_show(corrected_data))
+
+        def align_zlp_action(hspy_signal, val, *args):
             hspy_signal.align_zlp_signal_range(val)
             self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
 
-        def fitting_action(hspy_signal, val):
+        def flip_signal(hspy_signal, *args):
+            hspy_signal.gd.flip()
+            self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
+
+        def fitting_action(hspy_signal, val, *args):
             if which == 'gaussian':
                 new_di = hspy_signal.plot_gaussian(val)
             elif which == 'lorentzian':
                 new_di = hspy_signal.plot_lorentzian(val)
             self.event_loop.create_task(self.data_item_show(new_di))
 
-        def remove_background_action(hspy_signal, val):
+        def remove_background_action(hspy_signal, val, *args):
             hspy_signal.remove_background(val, which)
             self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
 
-        def decomposition_action(hspy_signal, val):
+        def deconvolve_hyperspec(hspy_signal, hspy_spec_signal, type, interactions, *args):
+            new_di = hspy_signal.deconvolution(hspy_spec_signal, type, interactions)
+            self.event_loop.create_task(self.data_item_show(new_di))
+
+        def decomposition_action(hspy_signal, val, *args):
             var, new_di = hspy_signal.signal_decomposition(val, which)
             self.event_loop.create_task(self.data_item_show(new_di))
             self.event_loop.create_task(self.data_item_show(var))
@@ -265,6 +277,12 @@ class handler:
             action = decomposition_action
         elif type == 'align_zlp':
             action = align_zlp_action
+        elif type == 'correct_junctions':
+            action = correct_junction
+        elif type == 'flip_signal':
+            action = flip_signal
+        elif type == 'deconvolve':
+            action = deconvolve_hyperspec
         else:
             raise Exception("***PANEL***: No action function was selected. Please check the correct type.")
 
@@ -272,8 +290,9 @@ class handler:
             self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
             for graphic in self.__current_DI.graphics:
                 if graphic.type == 'rect-graphic':  # This is a hyperspectral image
-                    logging.info('***PANEL***: Hyperspectrum selected. If you wish to perform this action, please select two '
-                                 'data items.')
+                    #logging.info('***PANEL***: Hyperspectrum selected. If you wish to perform this action, please select two '
+                    #             'data items.')
+                    action(self.gd)
                 if graphic.type == 'line-profile-graphic':  # This is Chrono
                     val = (graphic.start[1], graphic.end[1])
                     action(self.gd, val)
@@ -298,11 +317,17 @@ class handler:
             else:
                 logging.info('***PANEL***: Could not find referenced Data Item.')
 
+    def correct_junctions(self, widget):
+        self._general_actions('correct_junctions', 'None')
+    def flip_signal(self, widget):
+        self._general_actions('flip_signal', 'None')
     def remove_background_pl(self, widget):
         self._general_actions('remove_background', 'Power law')
-
     def remove_background_off(self, widget):
         self._general_actions('remove_background', 'Offset')
+
+    def deconvolve_rl_hspec(self, widget):
+        self._general_actions('deconvolve', 'rl')
 
     def fit_gaussian(self, widget):
         self._general_actions('fitting', 'gaussian')
