@@ -236,37 +236,50 @@ class handler:
 
         self.__current_DI = self._pick_di() #Single Data Item here
 
-        def correct_junction(hspy_signal, *args):
+        def correct_junction(hspy_signal):
             corrected_data = hspy_signal.detector_junctions()
             self.event_loop.create_task(self.data_item_show(corrected_data))
 
-        def align_zlp_action(hspy_signal, val, *args):
-            hspy_signal.align_zlp_signal_range(val)
+        def align_zlp_action(hspy_signal, interval):
+            hspy_signal.align_zlp_signal_range(interval)
             self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
 
-        def flip_signal(hspy_signal, *args):
-            hspy_signal.gd.flip()
+        def flip_signal(hspy_signal):
+            hspy_signal.flip()
             self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
 
-        def fitting_action(hspy_signal, val, *args):
+        def fitting_action(hspy_signal, interval):
             if which == 'gaussian':
-                new_di = hspy_signal.plot_gaussian(val)
+                new_di = hspy_signal.plot_gaussian(interval)
             elif which == 'lorentzian':
-                new_di = hspy_signal.plot_lorentzian(val)
+                new_di = hspy_signal.plot_lorentzian(interval)
             self.event_loop.create_task(self.data_item_show(new_di))
 
-        def remove_background_action(hspy_signal, val, *args):
-            hspy_signal.remove_background(val, which)
+        def remove_background_action(hspy_signal, interval):
+            hspy_signal.remove_background(interval, which)
             self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
 
-        def deconvolve_hyperspec(hspy_signal, hspy_spec_signal, type, interactions, *args):
-            new_di = hspy_signal.deconvolution(hspy_spec_signal, type, interactions)
-            self.event_loop.create_task(self.data_item_show(new_di))
+        def deconvolve_hyperspec(hspy_signal, reference_spec):
+            if which == 'rl':
+                new_di = hspy_signal.deconvolution(reference_spec, 'Richardson lucy', int(self.int_le.text))
+                self.event_loop.create_task(self.data_item_show(new_di))
 
-        def decomposition_action(hspy_signal, val, *args):
-            var, new_di = hspy_signal.signal_decomposition(val, which)
+        def decomposition_action(hspy_signal, *args):
+            if which == 'pca_mask':
+                interval = args[0]
+                var, new_di, factors, loadings_stacked = hspy_signal.signal_decomposition(range = interval,
+                                                                                          components=int(self.comp_le.text),
+                                                                                          mask=True)
+            elif which == 'pca':
+                var, new_di, factors, loadings_stacked = hspy_signal.signal_decomposition(components=int(self.comp_le.text),
+                                                                                          mask=False)
             self.event_loop.create_task(self.data_item_show(new_di))
             self.event_loop.create_task(self.data_item_show(var))
+            self.event_loop.create_task(self.data_item_show(factors))
+            self.event_loop.create_task(self.data_item_show(loadings_stacked))
+            #var, new_di = hspy_signal.signal_decomposition(interval, which)
+            #self.event_loop.create_task(self.data_item_show(new_di))
+            #self.event_loop.create_task(self.data_item_show(var))
 
 
         if type == 'fitting':
@@ -338,42 +351,48 @@ class handler:
     def align_zlp(self, widget):
         self._general_actions('align_zlp', 'None')
 
+    def pca_mask(self, widget):
+        self._general_actions('decomposition', 'pca_mask')
+
     def pca(self, widget):
-        try:
-            val = int(self.comp_le.text)
-        except ValueError:
-            logging.info("***PANEL***: Interaction value must be integer.")
-        self._general_actions('decomposition', val)
+        self._general_actions('decomposition', 'pca')
 
-
-    def pca_full(self, widget):
-        self._pca_full()
-
-    def _pca_full(self):
-        try:
-            val = int(self.comp_le.text)
-        except ValueError:
-            logging.info("***PANEL***: Components value must be integer.")
-        self.__current_DI = self._pick_di()
-        if self.__current_DI:
-            self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)  # hspec
-            var, new_di, factors, loadings_stacked = self.gd.signal_decomposition(components=val, mask=False)
-            self.event_loop.create_task(self.data_item_show(new_di))
-            self.event_loop.create_task(self.data_item_show(var))
-            self.event_loop.create_task(self.data_item_show(factors))
-            self.event_loop.create_task(self.data_item_show(loadings_stacked))
-
-            """
-            factors_np = numpy.copy(factors.data)
-            for i in range(val):
-                factor = factors_np[:, i]
-                factor_hs = orsay_data.HspySignal1D(factor)
-                #self._get_data(factor_hs, 'PCA_factors'+str(i)+'_'),
-                self.event_loop.create_task(self.data_item_show(factor_hs))
-                #self.event_loop.create_task(self.data_item_show(loadings))
-            """
-        else:
-            logging.info('***PANEL***: Could not find referenced Data Item.')
+    # def pca(self, widget):
+    #     try:
+    #         val = int(self.comp_le.text)
+    #     except ValueError:
+    #         logging.info("***PANEL***: Interaction value must be integer.")
+    #     self._general_actions('decomposition', val)
+    #
+    #
+    # def pca_full(self, widget):
+    #     self._pca_full()
+    #
+    # def _pca_full(self):
+    #     try:
+    #         val = int(self.comp_le.text)
+    #     except ValueError:
+    #         logging.info("***PANEL***: Components value must be integer.")
+    #     self.__current_DI = self._pick_di()
+    #     if self.__current_DI:
+    #         self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)  # hspec
+    #         var, new_di, factors, loadings_stacked = self.gd.signal_decomposition(components=val, mask=False)
+    #         self.event_loop.create_task(self.data_item_show(new_di))
+    #         self.event_loop.create_task(self.data_item_show(var))
+    #         self.event_loop.create_task(self.data_item_show(factors))
+    #         self.event_loop.create_task(self.data_item_show(loadings_stacked))
+    #
+    #         """
+    #         factors_np = numpy.copy(factors.data)
+    #         for i in range(val):
+    #             factor = factors_np[:, i]
+    #             factor_hs = orsay_data.HspySignal1D(factor)
+    #             #self._get_data(factor_hs, 'PCA_factors'+str(i)+'_'),
+    #             self.event_loop.create_task(self.data_item_show(factor_hs))
+    #             #self.event_loop.create_task(self.data_item_show(loadings))
+    #         """
+    #     else:
+    #         logging.info('***PANEL***: Could not find referenced Data Item.')
 
     def hspy_bin(self, widget):
         try:
@@ -584,8 +603,8 @@ class View:
 
         self.dec_text = ui.create_label(text='Signal decomposition (components): (', name='dec_text')
         self.comp_le = ui.create_line_edit(name='comp_le', width=15)
-        self.pca_pb = ui.create_push_button(text='Masked SVD', name='pca3_pb', on_clicked='pca')
-        self.pca2_pb = ui.create_push_button(text='Full SVD', name='pca3_pb', on_clicked='pca_full')
+        self.pca_pb = ui.create_push_button(text='Masked SVD', name='pca3_pb', on_clicked='pca_mask')
+        self.pca2_pb = ui.create_push_button(text='Full SVD', name='pca3_pb', on_clicked='pca')
         self.decomposition_row = ui.create_row(self.dec_text, self.comp_le, self.close_par, ui.create_spacing(5),
                                                self.pca_pb, self.pca2_pb,
                                                ui.create_stretch())
