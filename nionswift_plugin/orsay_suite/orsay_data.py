@@ -134,7 +134,7 @@ class HspySignal1D:
         r2 = self._rel_to_abs(range[1])
         self.hspy_gd = self.hspy_gd.remove_background(signal_range=(r1, r2), background_type=which)
 
-    def plot_gaussian(self, range):
+    def plot_gaussian(self, range: tuple) -> list:
         r1 = self._rel_to_abs(range[0])
         r2 = self._rel_to_abs(range[1])
 
@@ -146,13 +146,17 @@ class HspySignal1D:
         gaussian.centre.bmax = r2
         gaussian.A.value = numpy.max(self.hspy_gd.isig[r1:r2].data)
         m.append(gaussian)
+        m[0].active = False
         m.assign_current_values_to_all()
-        m.multifit(bounded=True, show_progressbar=False)
+        m.multifit(bounded=False, show_progressbar=False)
         m[1].print_current_values()
 
-        return self._get_data(m.as_signal(show_progressbar=False).isig[r1:r2], 'gaussian_fit_')
+        return [self._get_data(m.as_signal(show_progressbar=False).isig[r1:r2], 'gaussian_fit_'),
+                self._get_data(gaussian.A.as_signal(), 'gaussian_fit_amplitude_'),
+                self._get_data(gaussian.centre.as_signal(), 'gaussian_fit_centre_'),
+                self._get_data(gaussian.sigma.as_signal(), 'gaussian_fit_sigma_')]
 
-    def plot_lorentzian(self, range):
+    def plot_lorentzian(self, range: tuple) -> list:
         r1 = self._rel_to_abs(range[0])
         r2 = self._rel_to_abs(range[1])
 
@@ -164,13 +168,14 @@ class HspySignal1D:
         lor.centre.bmax = r2
         lor.A.value = numpy.max(self.hspy_gd.isig[r1:r2].data)
         m.append(lor)
+        m[0].active = False
         m.assign_current_values_to_all()
-        m.multifit(bounded=True, show_progressbar=False)
+        m.multifit(bounded=False, show_progressbar=False)
         m[1].print_current_values()
 
-        return self._get_data(m.as_signal().isig[r1:r2], 'lorentzian_fit_')
+        return [self._get_data(m.as_signal(show_progressbar=False).isig[r1:r2], 'lorentzian_fit_')]
 
-    def signal_decomposition(self, range=[0, 1], components=3, mask=True):
+    def signal_decomposition(self, range=[0, 1], components=3, mask=True) -> list:
 
         if mask:
             r1 = self._rel_to_abs(range[0])

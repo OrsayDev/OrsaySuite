@@ -64,6 +64,7 @@ class handler:
         self.__crossx_di = None
         self.__crossy_di = None
         self.__cross_fft = None
+        self.__actionThread = threading.Thread()
 
     def init_handler(self):
         self.event_loop.create_task(self.do_enable(True, ['']))
@@ -194,10 +195,11 @@ class handler:
 
         def fitting_action(hspy_signal, interval):
             if which == 'gaussian':
-                new_di = hspy_signal.plot_gaussian(interval)
+                results = hspy_signal.plot_gaussian(interval)
             elif which == 'lorentzian':
-                new_di = hspy_signal.plot_lorentzian(interval)
-            self.event_loop.create_task(self.data_item_show(new_di))
+                results = hspy_signal.plot_lorentzian(interval)
+            for result in results:
+                self.event_loop.create_task(self.data_item_show(result))
 
         def remove_background_action(hspy_signal, interval):
             hspy_signal.remove_background(interval, which)
@@ -211,16 +213,14 @@ class handler:
         def decomposition_action(hspy_signal, *args):
             if which == 'pca_mask':
                 interval = args[0]
-                var, new_di, factors, loadings_stacked = hspy_signal.signal_decomposition(range = interval,
+                results = hspy_signal.signal_decomposition(range = interval,
                                                                                           components=int(self.comp_le.text),
                                                                                           mask=True)
             elif which == 'pca':
-                var, new_di, factors, loadings_stacked = hspy_signal.signal_decomposition(components=int(self.comp_le.text),
+                results = hspy_signal.signal_decomposition(components=int(self.comp_le.text),
                                                                                           mask=False)
-            self.event_loop.create_task(self.data_item_show(new_di))
-            self.event_loop.create_task(self.data_item_show(var))
-            self.event_loop.create_task(self.data_item_show(factors))
-            self.event_loop.create_task(self.data_item_show(loadings_stacked))
+            for result in results:
+                self.event_loop.create_task(self.data_item_show(result))
 
         if type == 'fitting':
             action = fitting_action
@@ -275,34 +275,43 @@ class handler:
             else:
                 logging.info('***PANEL***: Could not find referenced Data Item.')
 
+    #Not used for now, but will be implemented soon
+    def _thread_manager(self, args):
+        if not self.__actionThread.is_alive():
+            self.__actionThread = threading.Thread(target=self._general_actions, args=args)
+            self.__actionThread.start()
     def correct_junctions(self, widget):
+        #self._thread_manager(('correct_junctions', 'None'))
         self._general_actions('correct_junctions', 'None')
     def flip_signal(self, widget):
+        #self._thread_manager(('flip_signal', 'None'))
         self._general_actions('flip_signal', 'None')
     def remove_background_pl(self, widget):
+        #self._thread_manager(('remove_background', 'Power law'))
         self._general_actions('remove_background', 'Power law')
     def remove_background_off(self, widget):
+        #self._thread_manager(('remove_background', 'Offset'))
         self._general_actions('remove_background', 'Offset')
-
     def deconvolve_rl_hspec(self, widget):
+        #self._thread_manager(('deconvolve', 'rl'))
         self._general_actions('deconvolve', 'rl')
-
     def fit_gaussian(self, widget):
+        #self._thread_manager(('fitting', 'gaussian'))
         self._general_actions('fitting', 'gaussian')
-
     def fit_lorentzian(self, widget):
+        #self._thread_manager(('fitting', 'lorentzian'))
         self._general_actions('fitting', 'lorentzian')
-
     def align_zlp(self, widget):
+        #self._thread_manager(('align_zlp', 'None'))
         self._general_actions('align_zlp', 'None')
-
     def pca_mask(self, widget):
+        #self._thread_manager(('decomposition', 'pca_mask'))
         self._general_actions('decomposition', 'pca_mask')
-
     def pca(self, widget):
+        #self._thread_manager(('decomposition', 'pca'))
         self._general_actions('decomposition', 'pca')
-
     def hspy_bin(self, widget):
+        #self._thread_manager(('data_bin', 'None'))
         self._general_actions('data_bin', 'None')
 
     def _pick_di(self):
@@ -506,7 +515,7 @@ class View:
         ))
 
         self.last_text = ui.create_label(text='<a href="https://github.com/OrsayDev/OrsaySuite">Orsay Tools v0.1.0</a>', name='last_text')
-        self.left_text = ui.create_label(text='<a href="https://hyperspy.org/hyperspy-doc/current/index.html">HyperSpy v1.6.5</a>', name='left_text')
+        self.left_text = ui.create_label(text='<a href="https://hyperspy.org/hyperspy-doc/current/index.html">HyperSpy v1.7.5</a>', name='left_text')
         self.last_row = ui.create_row(self.left_text, ui.create_stretch(), self.last_text)
 
         self.hyperspytab = ui.create_tab(label = 'Processing', content = ui.create_column(self.general_group,
