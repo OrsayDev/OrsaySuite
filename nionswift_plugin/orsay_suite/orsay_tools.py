@@ -64,6 +64,7 @@ class handler:
         self.__crossx_di = None
         self.__crossy_di = None
         self.__cross_fft = None
+        self.__actionThread = threading.Thread()
 
     def init_handler(self):
         self.event_loop.create_task(self.do_enable(True, ['']))
@@ -121,18 +122,6 @@ class handler:
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
-    def correct_junctions(self, widget):
-        self.__current_DI = None
-
-        self.__current_DI = self._pick_di()
-
-        if self.__current_DI:
-            self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
-            corrected_data = self.gd.detector_junctions()
-            self.event_loop.create_task(self.data_item_show(corrected_data))
-        else:
-            logging.info('***PANEL***: Could not find referenced Data Item.')
-
     def correct_gain(self, widget):
         #Not yet implemented. Needs ROI and threshold in metadata
         self.__current_DI = None
@@ -158,31 +147,6 @@ class handler:
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
-    def flip_signal(self, widget):
-        self.__current_DI = None
-
-        self.__current_DI = self._pick_di()
-
-        if self.__current_DI:
-            self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
-            self.gd.flip()
-            self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
-
-    def _align_chrono(self, align=True, bin=False):
-        self.__current_DI = None
-
-        self.__current_DI = self._pick_di()
-
-        if self.__current_DI:
-            self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
-            if align: self.gd.align_zlp()
-            if bin:
-                self.event_loop.create_task(self.data_item_show(self.gd.get_di(sum_inav=True)))
-            else:
-                self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
-        else:
-            logging.info('***PANEL***: Could not find referenced Data Item.')
-
     def gain_profile_data_item(self, widget):
         self.__current_DI = None
 
@@ -205,57 +169,58 @@ class handler:
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
-    def deconvolve_rl_hspec(self, widget):
-        try:
-            val = int(self.int_le.text)
-        except ValueError:
-            logging.info("***PANEL***: Interaction value must be integer.")
-        self._deconvolve_hspec('Richardson lucy', val)
-
-    def _deconvolve_hspec(self, type, interactions):
-        self.__current_DI = None
-
-        self.__current_DI = self._pick_di()
-
-        if self.__current_DI:
-            logging.info('***PANEL***: Must select to spectra for deconvolution.')
-        else:
-            dis = self._pick_dis()  # Multiple data items
-            val_spec = list()
-            if dis and len(dis) == 2:
-                self.gd = orsay_data.HspySignal1D(dis[0].data_item)  # hspec
-                self.spec_gd = orsay_data.HspySignal1D(dis[1].data_item) #spec
-                new_di = self.gd.deconvolution(self.spec_gd, type, interactions)
-                self.event_loop.create_task(self.data_item_show(new_di))
-            else:
-                logging.info('***PANEL***: Could not find referenced Data Item.')
-
-
     def _general_actions(self, type, which):
         self.__current_DI = None
 
-        self.__current_DI = self._pick_di()
+        self.__current_DI = self._pick_di() #Single Data Item here
 
-        def align_zlp_action(hspy_signal, val):
-            hspy_signal.align_zlp_signal_range(val)
+        def correct_junction(hspy_signal):
+            corrected_data = hspy_signal.detector_junctions()
+            self.event_loop.create_task(self.data_item_show(corrected_data))
+
+        def flip_signal(hspy_signal):
+            hspy_signal.flip()
             self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
 
-        def fitting_action(hspy_signal, val):
+        def data_bin(hspy_signal):
+            x = int(self.x_le.text)
+            y = int(self.y_le.text)
+            E = int(self.E_le.text)
+            hspy_signal.rebin(scale=[x, y, E])
+            self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
+
+        def align_zlp_action(hspy_signal, interval):
+            hspy_signal.align_zlp_signal_range(interval)
+            self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
+
+        def fitting_action(hspy_signal, interval):
             if which == 'gaussian':
-                new_di = hspy_signal.plot_gaussian(val)
+                results = hspy_signal.plot_gaussian(interval)
             elif which == 'lorentzian':
-                new_di = hspy_signal.plot_lorentzian(val)
-            self.event_loop.create_task(self.data_item_show(new_di))
+                results = hspy_signal.plot_lorentzian(interval)
+            for result in results:
+                self.event_loop.create_task(self.data_item_show(result))
 
-        def remove_background_action(hspy_signal, val):
-            hspy_signal.remove_background(val, which)
+        def remove_background_action(hspy_signal, interval):
+            hspy_signal.remove_background(interval, which)
             self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
 
-        def decomposition_action(hspy_signal, val):
-            var, new_di = hspy_signal.signal_decomposition(val, which)
+        def deconvolve_hyperspec(hspy_signal, reference_spec):
+            if which == 'rl':
+                new_di = hspy_signal.deconvolution(reference_spec, 'Richardson lucy', int(self.int_le.text))
             self.event_loop.create_task(self.data_item_show(new_di))
-            self.event_loop.create_task(self.data_item_show(var))
 
+        def decomposition_action(hspy_signal, *args):
+            if which == 'pca_mask':
+                interval = args[0]
+                results = hspy_signal.signal_decomposition(range = interval,
+                                                                                          components=int(self.comp_le.text),
+                                                                                          mask=True)
+            elif which == 'pca':
+                results = hspy_signal.signal_decomposition(components=int(self.comp_le.text),
+                                                                                          mask=False)
+            for result in results:
+                self.event_loop.create_task(self.data_item_show(result))
 
         if type == 'fitting':
             action = fitting_action
@@ -265,6 +230,14 @@ class handler:
             action = decomposition_action
         elif type == 'align_zlp':
             action = align_zlp_action
+        elif type == 'correct_junctions':
+            action = correct_junction
+        elif type == 'flip_signal':
+            action = flip_signal
+        elif type == 'deconvolve':
+            action = deconvolve_hyperspec
+        elif type == 'data_bin':
+            action = data_bin
         else:
             raise Exception("***PANEL***: No action function was selected. Please check the correct type.")
 
@@ -272,8 +245,7 @@ class handler:
             self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
             for graphic in self.__current_DI.graphics:
                 if graphic.type == 'rect-graphic':  # This is a hyperspectral image
-                    logging.info('***PANEL***: Hyperspectrum selected. If you wish to perform this action, please select two '
-                                 'data items.')
+                    action(self.gd)
                 if graphic.type == 'line-profile-graphic':  # This is Chrono
                     val = (graphic.start[1], graphic.end[1])
                     action(self.gd, val)
@@ -283,92 +255,64 @@ class handler:
                     action(self.gd, val)
         else:
             dis = self._pick_dis()  # Multiple data items
-            val_spec = list()
+            interval_spec = list()
             if dis and len(dis) == 2:
                 spec = dis[1]
                 hspec = dis[0]
                 for graphic in spec.graphics:
                     if graphic.type == 'interval-graphic':
-                        val_spec = graphic.interval
+                        interval_spec = graphic.interval
                 for graphic in hspec.graphics:
-                    if graphic.type == 'rect-graphic' and len(val_spec) == 2:
+                    if graphic.type == 'rect-graphic' and len(interval_spec) == 2: #interval_spec is an interval
                         self.gd = orsay_data.HspySignal1D(hspec.data_item)
-                        action(self.gd, val_spec)
+                        action(self.gd, interval_spec)
                         return
+                    #If there is no interval, pass the reference spectrum entirely
+                    self.gd = orsay_data.HspySignal1D(hspec.data_item)
+                    ref_spec = orsay_data.HspySignal1D(spec.data_item)
+                    action(self.gd, ref_spec)
+                    return
             else:
                 logging.info('***PANEL***: Could not find referenced Data Item.')
 
+    #Not used for now, but will be implemented soon
+    def _thread_manager(self, args):
+        if not self.__actionThread.is_alive():
+            self.__actionThread = threading.Thread(target=self._general_actions, args=args)
+            self.__actionThread.start()
+    def correct_junctions(self, widget):
+        #self._thread_manager(('correct_junctions', 'None'))
+        self._general_actions('correct_junctions', 'None')
+    def flip_signal(self, widget):
+        #self._thread_manager(('flip_signal', 'None'))
+        self._general_actions('flip_signal', 'None')
     def remove_background_pl(self, widget):
+        #self._thread_manager(('remove_background', 'Power law'))
         self._general_actions('remove_background', 'Power law')
-
     def remove_background_off(self, widget):
+        #self._thread_manager(('remove_background', 'Offset'))
         self._general_actions('remove_background', 'Offset')
-
+    def deconvolve_rl_hspec(self, widget):
+        #self._thread_manager(('deconvolve', 'rl'))
+        self._general_actions('deconvolve', 'rl')
     def fit_gaussian(self, widget):
+        #self._thread_manager(('fitting', 'gaussian'))
         self._general_actions('fitting', 'gaussian')
-
     def fit_lorentzian(self, widget):
+        #self._thread_manager(('fitting', 'lorentzian'))
         self._general_actions('fitting', 'lorentzian')
-
     def align_zlp(self, widget):
+        #self._thread_manager(('align_zlp', 'None'))
         self._general_actions('align_zlp', 'None')
-
+    def pca_mask(self, widget):
+        #self._thread_manager(('decomposition', 'pca_mask'))
+        self._general_actions('decomposition', 'pca_mask')
     def pca(self, widget):
-        try:
-            val = int(self.comp_le.text)
-        except ValueError:
-            logging.info("***PANEL***: Interaction value must be integer.")
-        self._general_actions('decomposition', val)
-
-
-    def pca_full(self, widget):
-        self._pca_full()
-
-    def _pca_full(self):
-        try:
-            val = int(self.comp_le.text)
-        except ValueError:
-            logging.info("***PANEL***: Components value must be integer.")
-        self.__current_DI = self._pick_di()
-        if self.__current_DI:
-            self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)  # hspec
-            var, new_di, factors, loadings_stacked = self.gd.signal_decomposition(components=val, mask=False)
-            self.event_loop.create_task(self.data_item_show(new_di))
-            self.event_loop.create_task(self.data_item_show(var))
-            self.event_loop.create_task(self.data_item_show(factors))
-            self.event_loop.create_task(self.data_item_show(loadings_stacked))
-
-            """
-            factors_np = numpy.copy(factors.data)
-            for i in range(val):
-                factor = factors_np[:, i]
-                factor_hs = orsay_data.HspySignal1D(factor)
-                #self._get_data(factor_hs, 'PCA_factors'+str(i)+'_'),
-                self.event_loop.create_task(self.data_item_show(factor_hs))
-                #self.event_loop.create_task(self.data_item_show(loadings))
-            """
-        else:
-            logging.info('***PANEL***: Could not find referenced Data Item.')
-
+        #self._thread_manager(('decomposition', 'pca'))
+        self._general_actions('decomposition', 'pca')
     def hspy_bin(self, widget):
-        try:
-            x = int(self.x_le.text)
-            y = int(self.y_le.text)
-            E = int(self.E_le.text)
-
-            self.__current_DI = None
-
-            self.__current_DI = self._pick_di()
-
-            if self.__current_DI:
-                self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
-                self.gd.rebin(scale=[x, y, E])
-                self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
-            else:
-                logging.info('***PANEL***: Could not find referenced Data Item.')
-
-        except ValueError:
-            logging.info("***PANEL***: Bin values must be integers.")
+        #self._thread_manager(('data_bin', 'None'))
+        self._general_actions('data_bin', 'None')
 
     def _pick_di(self):
         display_item = self.document_controller.selected_display_item
@@ -466,17 +410,6 @@ class handler:
         self.property_changed_event.fire("shifter_u")
         self.property_changed_event.fire("shifter_v")
 
-    def set_calibration(self, widget):
-        if widget.text == 'Ok 100 nm X':
-            dim = 0
-            value = self.shifter_u
-        elif widget.text == 'Ok 100 nm Y':
-            dim = 1
-            value = self.shifter_v
-        self.__drift.set_calibration(dim, value)
-        self.property_changed_event.fire("shifter_u_calib")
-        self.property_changed_event.fire("shifter_v_calib")
-
     @property
     def shifter_u(self):
         return round(self.__drift.get_shifters()[0]*1e9, 3)
@@ -484,14 +417,6 @@ class handler:
     @property
     def shifter_v(self):
         return round(self.__drift.get_shifters()[1]*1e9, 3)
-
-    @property
-    def shifter_u_calib(self):
-        return round(self.__drift.shifter_calibration['calib.x']*1e9, 3)
-
-    @property
-    def shifter_v_calib(self):
-        return round(self.__drift.shifter_calibration['calib.y']*1e9, 3)
 
 class View:
 
@@ -551,16 +476,16 @@ class View:
 
         #Hyperspectral group
         self.deconvolution_text = ui.create_label(text='Signal deconvolution (interactions): (', name='deconvolution_text')
-        self.int_le = ui.create_line_edit(name='int_le', width=15)
+        self.int_le = ui.create_line_edit(name='int_le', width=20)
         self.dec_rl_pb = ui.create_push_button(text='Richardson-Lucy', name='dec_rl_pb',
                                             on_clicked='deconvolve_rl_hspec')
         self.pb_row = ui.create_row(self.deconvolution_text, self.int_le, self.close_par, ui.create_spacing(5),
                                     self.dec_rl_pb, ui.create_stretch())
 
         self.dec_text = ui.create_label(text='Signal decomposition (components): (', name='dec_text')
-        self.comp_le = ui.create_line_edit(name='comp_le', width=15)
-        self.pca_pb = ui.create_push_button(text='Masked SVD', name='pca3_pb', on_clicked='pca')
-        self.pca2_pb = ui.create_push_button(text='Full SVD', name='pca3_pb', on_clicked='pca_full')
+        self.comp_le = ui.create_line_edit(name='comp_le', width=20)
+        self.pca_pb = ui.create_push_button(text='Masked SVD', name='pca3_pb', on_clicked='pca_mask')
+        self.pca2_pb = ui.create_push_button(text='Full SVD', name='pca3_pb', on_clicked='pca')
         self.decomposition_row = ui.create_row(self.dec_text, self.comp_le, self.close_par, ui.create_spacing(5),
                                                self.pca_pb, self.pca2_pb,
                                                ui.create_stretch())
@@ -571,7 +496,7 @@ class View:
         ))
 
         self.last_text = ui.create_label(text='<a href="https://github.com/OrsayDev/OrsaySuite">Orsay Tools v0.1.0</a>', name='last_text')
-        self.left_text = ui.create_label(text='<a href="https://hyperspy.org/hyperspy-doc/current/index.html">HyperSpy v1.6.5</a>', name='left_text')
+        self.left_text = ui.create_label(text='<a href="https://hyperspy.org/hyperspy-doc/current/index.html">HyperSpy v1.7.5</a>', name='left_text')
         self.last_row = ui.create_row(self.left_text, ui.create_stretch(), self.last_text)
 
         self.hyperspytab = ui.create_tab(label = 'Processing', content = ui.create_column(self.general_group,
@@ -631,18 +556,12 @@ class View:
         #Shifters
         self.shifter_dim1_label = ui.create_label(name='shifter_dim1_label', text='Shifter.x: ')
         self.shifter_dim1_value = ui.create_label(name='shifter_dim1_value', text='@binding(shifter_u)')
-        self.shifter_dim1_calib_label = ui.create_label(name='shifter_dim1_calib_label', text='Shifter.x (100 nm): ')
-        self.shifter_dim1_calib_value = ui.create_label(name='shifter_dim1_calib_value', text='@binding(shifter_u_calib)')
 
         self.shifter_dim2_label = ui.create_label(name='shifter_dim2_label', text='Shifter.y: ')
         self.shifter_dim2_value = ui.create_label(name='shifter_dim2_value', text='@binding(shifter_v)')
-        self.shifter_dim2_calib_label = ui.create_label(name='shifter_dim2_calib_label', text='Shifter.y (100 nm): ')
-        self.shifter_dim2_calib_value = ui.create_label(name='shifter_dim2_calib_value', text='@binding(shifter_v_calib)')
 
-        self.shifter_dim1_row = ui.create_row(self.shifter_dim1_label, self.shifter_dim1_value, ui.create_spacing(100),
-                                              self.shifter_dim1_calib_label, self.shifter_dim1_calib_value, ui.create_stretch())
-        self.shifter_dim2_row = ui.create_row(self.shifter_dim2_label, self.shifter_dim2_value, ui.create_spacing(100),
-                                              self.shifter_dim2_calib_label, self.shifter_dim2_calib_value, ui.create_stretch())
+        self.shifter_dim1_row = ui.create_row(self.shifter_dim1_label, self.shifter_dim1_value, ui.create_stretch())
+        self.shifter_dim2_row = ui.create_row(self.shifter_dim2_label, self.shifter_dim2_value, ui.create_stretch())
 
         self.calib_shifter_dim1_label = ui.create_label(name = 'calib_shifter_dim1_label', text='Shiter.x step: ')
         self.calib_shifter_dim1_value = ui.create_line_edit(name='calib_shifter_dim1_value', width=50)
@@ -652,20 +571,15 @@ class View:
                                                ui.create_stretch(),
                                                self.calib_shifter_dim2_label, self.calib_shifter_dim2_value)
 
-        self.calib_dim1_pb = ui.create_push_button(name='calib_dim1_pb', text='Displace X',
+        self.displace_dim1_pb = ui.create_push_button(name='calib_dim1_pb', text='Displace X',
                                                    on_clicked='displace_shifter')
-        self.calib_dim2_pb = ui.create_push_button(name='calib_dim1_pb', text='Displace Y',
+        self.displace_dim2_pb = ui.create_push_button(name='calib_dim1_pb', text='Displace Y',
                                                    on_clicked='displace_shifter')
-        self.calib_reset_pb = ui.create_push_button(name='calib_reset_pb', text='Reset Shifter',
+        self.displace_reset_pb = ui.create_push_button(name='calib_reset_pb', text='Reset Shifter',
                                                    on_clicked='reset_shifter')
 
-        self.shifter_dim1_pb = ui.create_push_button(name='shifter_dim1_pb', text='Ok 100 nm X',
-                                                     on_clicked='set_calibration')
-        self.shifter_dim2_pb = ui.create_push_button(name='shifter_dim2_pb', text='Ok 100 nm Y',
-                                                     on_clicked='set_calibration')
-
-        self.calib_dim_row = ui.create_row(self.calib_dim1_pb, self.shifter_dim1_pb, ui.create_stretch(), self.calib_reset_pb,
-                                           ui.create_stretch(), self.calib_dim2_pb, self.shifter_dim2_pb)
+        self.calib_dim_row = ui.create_row(self.displace_dim1_pb, ui.create_stretch(), self.displace_reset_pb,
+                                           ui.create_stretch(), self.displace_dim2_pb)
 
         self.third_group = ui.create_group(name='third_group', title='Shifters',
                                             content=ui.create_column(self.shifter_dim1_row, self.shifter_dim2_row,
