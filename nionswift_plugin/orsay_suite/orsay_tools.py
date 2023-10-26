@@ -476,14 +476,14 @@ class View:
 
         #Hyperspectral group
         self.deconvolution_text = ui.create_label(text='Signal deconvolution (interactions): (', name='deconvolution_text')
-        self.int_le = ui.create_line_edit(name='int_le', width=15)
+        self.int_le = ui.create_line_edit(name='int_le', width=20)
         self.dec_rl_pb = ui.create_push_button(text='Richardson-Lucy', name='dec_rl_pb',
                                             on_clicked='deconvolve_rl_hspec')
         self.pb_row = ui.create_row(self.deconvolution_text, self.int_le, self.close_par, ui.create_spacing(5),
                                     self.dec_rl_pb, ui.create_stretch())
 
         self.dec_text = ui.create_label(text='Signal decomposition (components): (', name='dec_text')
-        self.comp_le = ui.create_line_edit(name='comp_le', width=15)
+        self.comp_le = ui.create_line_edit(name='comp_le', width=20)
         self.pca_pb = ui.create_push_button(text='Masked SVD', name='pca3_pb', on_clicked='pca_mask')
         self.pca2_pb = ui.create_push_button(text='Full SVD', name='pca3_pb', on_clicked='pca')
         self.decomposition_row = ui.create_row(self.dec_text, self.comp_le, self.close_par, ui.create_spacing(5),

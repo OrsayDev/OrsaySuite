@@ -189,9 +189,10 @@ class DriftCorrection:
                     self.displace_shifter_relative(1, - 0.8 * ydrift * (self.__interval + time_correction))
 
                 callback()
-            if not self.__static_reference:
-                logging.info(f'new reference image')
-                reference_image = new_image
+            else:
+                logging.info(f'***Drift Correction***: Image shape between reference and new image is different. '
+                             f'Restart drift correction for proper calibration.')
+            if not self.__static_reference: reference_image = new_image
             end = time.time()
             logging.info(f'***Drift Correction***: Drift.x {xdrift} (nm/s). Drift.y: {ydrift} (nm/s). '
                          f'Interval: {end - start} (s).')
