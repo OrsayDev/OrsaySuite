@@ -28,20 +28,17 @@ class HspySignal1D:
             self.hspy_gd.axes_manager[index].scale = di.dimensional_calibrations[index].scale
             self.hspy_gd.axes_manager[index].units = di.dimensional_calibrations[index].units
 
-        #logging.info(f'***HSPY***: The axes of the collected data is {self.hspy_gd.axes_manager}.')
-
-
-
-    def flip(self):
+    #Methods that modify the hyperspy object
+    def flip(self) -> None:
         signal_axis = len(self.hspy_gd.data.shape)-1
         self.hspy_gd.data = numpy.flip(self.hspy_gd.data, axis=signal_axis)
 
-    def interpolate(self):
+    def interpolate(self) -> None:
         self.hspy_gd.interpolate_in_between(256 - 1, 256 + 1, show_progressbar=False)
         self.hspy_gd.interpolate_in_between(256*2 - 1, 256*2 + 1, show_progressbar=False)
         self.hspy_gd.interpolate_in_between(256*3 - 1, 256*3 + 1, show_progressbar=False)
 
-    def rebin(self, scale):
+    def rebin(self, scale) -> None:
         if self.nav_len == 0:
             self.hspy_gd = self.hspy_gd.rebin(scale=[scale[2]])
         elif self.nav_len == 1:
@@ -49,36 +46,12 @@ class HspySignal1D:
         elif self.nav_len == 2:
             self.hspy_gd = self.hspy_gd.rebin(scale=scale)
 
-    def align_zlp(self):
-        self.hspy_gd.align_zero_loss_peak(show_progressbar=False)
-
-    def align_zlp_signal_range(self, range):
+    def align_zlp_signal_range(self, range) -> None:
         r1 = self._rel_to_abs(range[0])
         r2 = self._rel_to_abs(range[1])
         self.hspy_gd.align_zero_loss_peak(subpixel=False, show_progressbar=False, signal_range=[r1, r2])
 
-    def get_data(self):
-        return self.hspy_gd.data
-
-    def get_attr(self, which):
-        return self.di.description[which]
-
-    def get_axes_offset(self, index):
-        return self.hspy_gd.axes_manager[index].offset
-
-    def get_axes_offset_all(self):
-        return [self.hspy_gd.axes_manager[index].offset for index in range(len(self.hspy_gd.data.shape))]
-
-    def get_axes_scale(self, index):
-        return self.hspy_gd.axes_manager[index].scale
-
-    def get_axes_scale_all(self):
-        return [self.hspy_gd.axes_manager[index].scale for index in range(len(self.hspy_gd.data.shape))]
-
-    def get_axes_units_all(self):
-        return [self.hspy_gd.axes_manager[index].units for index in range(len(self.hspy_gd.data.shape))]
-
-    def _get_data(self, temp_data, prefix):
+    def _get_data(self, temp_data, prefix, is_sequence = False, collection_dimension = None, datum_dimension = None) -> DataItem.DataItem:
         timezone = Utility.get_local_timezone()
         timezone_offset = Utility.TimezoneMinutesToStringConverter().convert(Utility.local_utcoffset_minutes())
         calibration = Calibration.Calibration()
@@ -88,7 +61,12 @@ class HspySignal1D:
             dimensional_calibrations[index].scale = temp_data.axes_manager[index].scale
             dimensional_calibrations[index].units = temp_data.axes_manager[index].units
 
+        if collection_dimension == None or datum_dimension == None:
+            data_descriptor = None
+        else:
+            data_descriptor = DataAndMetadata.DataDescriptor(is_sequence, collection_dimension, datum_dimension)
         xdata = DataAndMetadata.new_data_and_metadata(temp_data.data, calibration, dimensional_calibrations,
+                                                      data_descriptor=data_descriptor,
                                                       metadata=self.di.metadata,
                                                       timezone=timezone, timezone_offset=timezone_offset)
         data_item = DataItem.DataItem()
@@ -100,9 +78,6 @@ class HspySignal1D:
         #logging.info(f'***HSPY***: The axes of the returned data is {temp_data.axes_manager}.')
 
         return data_item
-
-    def bin_data(self, scale):
-        self.hspy_gd = self.hspy_gd.rebin(scale=scale)
 
     def get_di(self, inav=None, isig=None, sum_inav=None, sum_isig=None):
         temp_data = self.hspy_gd
@@ -124,12 +99,12 @@ class HspySignal1D:
 
         return self._get_data(temp_data, 'processed_')
 
-    def remove_background(self, range, which):
+    def remove_background(self, range, which) -> None:
         r1 = self._rel_to_abs(range[0])
         r2 = self._rel_to_abs(range[1])
         self.hspy_gd = self.hspy_gd.remove_background(signal_range=(r1, r2), background_type=which)
 
-    def plot_gaussian(self, range):
+    def plot_gaussian(self, range: tuple) -> list:
         r1 = self._rel_to_abs(range[0])
         r2 = self._rel_to_abs(range[1])
 
@@ -141,13 +116,17 @@ class HspySignal1D:
         gaussian.centre.bmax = r2
         gaussian.A.value = numpy.max(self.hspy_gd.isig[r1:r2].data)
         m.append(gaussian)
+        m[0].active = False
         m.assign_current_values_to_all()
-        m.multifit(bounded=True, show_progressbar=False)
+        m.multifit(bounded=False, show_progressbar=False)
         m[1].print_current_values()
 
-        return self._get_data(m.as_signal(show_progressbar=False).isig[r1:r2], 'gaussian_fit_')
+        return [self._get_data(m.as_signal(show_progressbar=False).isig[r1:r2], 'gaussian_fit_'),
+                self._get_data(gaussian.A.as_signal(), 'gaussian_fit_amplitude_'),
+                self._get_data(gaussian.centre.as_signal(), 'gaussian_fit_centre_'),
+                self._get_data(gaussian.sigma.as_signal(), 'gaussian_fit_sigma_')]
 
-    def plot_lorentzian(self, range):
+    def plot_lorentzian(self, range: tuple) -> list:
         r1 = self._rel_to_abs(range[0])
         r2 = self._rel_to_abs(range[1])
 
@@ -159,13 +138,14 @@ class HspySignal1D:
         lor.centre.bmax = r2
         lor.A.value = numpy.max(self.hspy_gd.isig[r1:r2].data)
         m.append(lor)
+        m[0].active = False
         m.assign_current_values_to_all()
-        m.multifit(bounded=True, show_progressbar=False)
+        m.multifit(bounded=False, show_progressbar=False)
         m[1].print_current_values()
 
-        return self._get_data(m.as_signal().isig[r1:r2], 'lorentzian_fit_')
+        return [self._get_data(m.as_signal(show_progressbar=False).isig[r1:r2], 'lorentzian_fit_')]
 
-    def signal_decomposition(self, range=[0, 1], components=3, mask=True):
+    def signal_decomposition(self, range=[0, 1], components=3, mask=True) -> list:
 
         if mask:
             r1 = self._rel_to_abs(range[0])
@@ -175,12 +155,38 @@ class HspySignal1D:
             signal_mask2.isig[r1: r2] = True
             self.hspy_gd.decomposition(True, svd_solver='full', signal_mask=signal_mask2)
         else:
-            self.hspy_gd.decomposition(True, svd_solver='full')
+            self.hspy_gd.decomposition(True)  # , svd_solver = 'full')
 
-        variance = self.hspy_gd.get_explained_variance_ratio()
+        variance = self.hspy_gd.get_explained_variance_ratio().isig[0:50]
         spim_dec = self.hspy_gd.get_decomposition_model(components)
+        factors = hs.signals.Signal1D(self.hspy_gd.learning_results.factors[:, :components].reshape(self.signal_size, components).transpose())
+        shape_loading = self.hspy_gd.axes_manager._navigation_shape_in_array
+        loadings_stacked = hs.signals.Signal1D(
+            self.hspy_gd.learning_results.loadings[:, :components].reshape(shape_loading[0], shape_loading[1], components).transpose())
 
-        return [self._get_data(variance, 'PCAvar'+str(components)+'_'), self._get_data(spim_dec, 'PCA'+str(components)+'_')]
+        # Calibrate factors
+        factors.axes_manager[1].name = "Energy"
+        factors.axes_manager[1].scale = self.hspy_gd.axes_manager[2].scale
+        factors.axes_manager[1].offset = self.hspy_gd.axes_manager[2].offset
+        factors.axes_manager[1].units = self.hspy_gd.axes_manager[2].units
+
+        # Calibrate loadings
+        loadings_stacked.axes_manager[1].name = "Width"
+        loadings_stacked.axes_manager[1].scale = self.hspy_gd.axes_manager[0].scale
+        loadings_stacked.axes_manager[1].offset = self.hspy_gd.axes_manager[0].offset
+        loadings_stacked.axes_manager[1].units = self.hspy_gd.axes_manager[0].units
+
+        loadings_stacked.axes_manager[2].name = "Height"
+        loadings_stacked.axes_manager[2].scale = self.hspy_gd.axes_manager[1].scale
+        loadings_stacked.axes_manager[2].offset = self.hspy_gd.axes_manager[1].offset
+        loadings_stacked.axes_manager[2].units = self.hspy_gd.axes_manager[1].units
+
+        return [
+            self._get_data(variance, 'PCAvar' + str(components) + '_'),
+            self._get_data(spim_dec, 'PCA_SpimFiltered' + str(components) + '_'),
+            self._get_data(factors, 'PCA_factors' + str(components) + '_', is_sequence=True, collection_dimension=0, datum_dimension=1),
+            self._get_data(loadings_stacked, 'PCA_loadings' + str(components) + '_', is_sequence=True, collection_dimension=0, datum_dimension=2)
+        ]
 
     def _rel_to_abs(self, val):
         return self.signal_calib.offset + val*self.signal_calib.scale*self.signal_size
@@ -262,8 +268,9 @@ class HspyGain(HspySignal1D):
         super().__init__(di)
 
     def rebin(self):
+        attr = self.di.description['averages']
         initial = self.hspy_gd.axes_manager[0].offset
-        self.hspy_gd = self.hspy_gd.rebin(scale=[self.get_attr('averages'), 1])
+        self.hspy_gd = self.hspy_gd.rebin(scale=[attr, 1])
         self.hspy_gd.axes_manager[0].offset = initial
 
     def get_gain_profile(self):
