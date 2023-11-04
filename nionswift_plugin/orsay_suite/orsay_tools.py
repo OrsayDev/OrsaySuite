@@ -82,6 +82,7 @@ class handler:
         self.manual_drift_x_value.text = '1.0'
         self.manual_drift_y_value.text = '1.0'
         self.scan_selection_dd.items = self.__drift.scan_systems
+        self.instrument_selection_dd.items = self.__drift.instrument_systems
 
     async def data_item_show(self, DI):
         self.document_controller.document_model.append_data_item(DI)
@@ -325,7 +326,8 @@ class handler:
     def activate_cross_correlation(self, widget):
         if 'Measure' in widget.text:
             should_correct = 'Correct' in widget.text
-            if not self.__drift.start(self._update_cross_correlation, self.__drift.scan_systems[self.scan_selection_dd.current_index], self.time_interval_value.text,
+            if not self.__drift.start(self._update_cross_correlation, self.__drift.scan_systems[self.scan_selection_dd.current_index],
+                                      self.__drift.instrument_systems[self.instrument_selection_dd.current_index], self.time_interval_value.text,
                                self.static_reference_pb.checked, should_correct, False, (self.manual_drift_x_value.text, self.manual_drift_y_value.text)):
                 self.note_label.text = 'Status: Not running (activate scan channel)'
                 return
@@ -377,14 +379,6 @@ class handler:
         self.property_changed_event.fire("shifter_u")
         self.property_changed_event.fire("shifter_v")
 
-    def displace_shifter(self, widget):
-        if widget.text == 'Displace X':
-            self.__drift.displace_shifter_relative(0, float(self.calib_shifter_dim1_value.text))
-        if widget.text == 'Displace Y':
-            self.__drift.displace_shifter_relative(1, float(self.calib_shifter_dim2_value.text))
-        self.property_changed_event.fire("shifter_u")
-        self.property_changed_event.fire("shifter_v")
-
     def start_manual_correction(self, widget):
         if widget.text == "Start":
             if not self.__drift.start(self._update_cross_correlation, self.__drift.scan_systems[self.scan_selection_dd.current_index], self.time_interval_manual_value.text,
@@ -404,19 +398,36 @@ class handler:
             self.time_interval_manual_value.enabled = True
             self.__drift.abort()
 
-    def reset_shifter(self, widget):
-        self.__drift.displace_shifter_reset(0)
-        self.__drift.displace_shifter_reset(1)
+    # def reset_shifter(self, widget):
+    #     self.__drift.displace_shifter_reset(0)
+    #     self.__drift.displace_shifter_reset(1)
+    #     self.property_changed_event.fire("shifter_u")
+    #     self.property_changed_event.fire("shifter_v")
+
+    def displace_shifter(self, widget):
+        instrument_id = self.__drift.instrument_systems[self.instrument_selection_dd.current_index]
+        if widget.text == 'Displace X':
+            self.__drift.displace_shifter_relative(instrument_id, 0, float(self.calib_shifter_dim1_value.text))
+        if widget.text == 'Displace Y':
+            self.__drift.displace_shifter_relative(instrument_id, 1, float(self.calib_shifter_dim2_value.text))
         self.property_changed_event.fire("shifter_u")
         self.property_changed_event.fire("shifter_v")
 
     @property
     def shifter_u(self):
-        return round(self.__drift.get_shifters()[0]*1e9, 3)
+        try:
+            instrument_id = self.__drift.instrument_systems[self.instrument_selection_dd.current_index]
+            return round(self.__drift.get_shifters(instrument_id)[0]*1e9, 3)
+        except IndexError:
+            logging.info('***Drift Correction***: No instrument has been found.')
 
     @property
     def shifter_v(self):
-        return round(self.__drift.get_shifters()[1]*1e9, 3)
+        try:
+            instrument_id = self.__drift.instrument_systems[self.instrument_selection_dd.current_index]
+            return round(self.__drift.get_shifters(instrument_id)[1]*1e9, 3)
+        except IndexError:
+            logging.info('***Drift Correction***: No instrument has been found.')
 
 class View:
 
@@ -505,11 +516,16 @@ class View:
         ##End of hyperspy data processing tab
         # Begin of cross-correlation tab
 
-        #Scan Engine
+        #Scan Engine & instrument
         self.scan_selection_label = ui.create_label(text='Choose the scan system: ')
-        self.scan_selection_dd = ui.create_combo_box(name='scan_selection_dd', items=['a'])
+        self.scan_selection_dd = ui.create_combo_box(name='scan_selection_dd', items=['None'])
         self.first_row = ui.create_row(self.scan_selection_label, self.scan_selection_dd, ui.create_stretch())
-        self.first_group = ui.create_group(title='Scan Engine', content=self.first_row)
+
+        self.instrument_selection_label = ui.create_label(text='Choose the instrument system: ')
+        self.instrument_selection_dd = ui.create_combo_box(name='instrument_selection_dd', items=['None'])
+        self.instrument_row = ui.create_row(self.instrument_selection_label, self.instrument_selection_dd, ui.create_stretch())
+        self.first_group = ui.create_group(title='Scan Engine', content=ui.create_column(self.instrument_row,
+                                                                                         self.first_row))
 
         #Automatic Correction
         self.act_corr_pushb = ui.create_push_button(name='act_corr_pushb', text='Measure', on_clicked='activate_cross_correlation')
@@ -560,8 +576,8 @@ class View:
         self.shifter_dim2_label = ui.create_label(name='shifter_dim2_label', text='Shifter.y: ')
         self.shifter_dim2_value = ui.create_label(name='shifter_dim2_value', text='@binding(shifter_v)')
 
-        self.shifter_dim1_row = ui.create_row(self.shifter_dim1_label, self.shifter_dim1_value, ui.create_stretch())
-        self.shifter_dim2_row = ui.create_row(self.shifter_dim2_label, self.shifter_dim2_value, ui.create_stretch())
+        self.shifter_dim1_row = ui.create_row(self.shifter_dim1_label, self.shifter_dim1_value, ui.create_stretch(),
+                                              self.shifter_dim2_label, self.shifter_dim2_value)
 
         self.calib_shifter_dim1_label = ui.create_label(name = 'calib_shifter_dim1_label', text='Shiter.x step: ')
         self.calib_shifter_dim1_value = ui.create_line_edit(name='calib_shifter_dim1_value', width=50)
@@ -575,14 +591,12 @@ class View:
                                                    on_clicked='displace_shifter')
         self.displace_dim2_pb = ui.create_push_button(name='calib_dim1_pb', text='Displace Y',
                                                    on_clicked='displace_shifter')
-        self.displace_reset_pb = ui.create_push_button(name='calib_reset_pb', text='Reset Shifter',
-                                                   on_clicked='reset_shifter')
 
-        self.calib_dim_row = ui.create_row(self.displace_dim1_pb, ui.create_stretch(), self.displace_reset_pb,
+        self.calib_dim_row = ui.create_row(self.displace_dim1_pb, ui.create_stretch(),
                                            ui.create_stretch(), self.displace_dim2_pb)
 
         self.third_group = ui.create_group(name='third_group', title='Shifters',
-                                            content=ui.create_column(self.shifter_dim1_row, self.shifter_dim2_row,
+                                            content=ui.create_column(self.shifter_dim1_row,
                                                                      self.calib_shifter_row, self.calib_dim_row))
 
 
