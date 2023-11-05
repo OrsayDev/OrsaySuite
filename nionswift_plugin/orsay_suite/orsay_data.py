@@ -1,5 +1,4 @@
-import os
-import logging
+import os, logging, inspect
 
 import numpy
 from nion.data import Calibration
@@ -11,6 +10,11 @@ import hyperspy.api as hs
 from . import read_data_gain
 
 __author__ = "Yves Auad"
+
+def get_source_code(func):
+    source_lines, _ = inspect.getsourcelines(func)
+    source_code = ''.join(source_lines)
+    return source_code
 
 class HspySignal1D:
     def __init__(self, di):
@@ -261,20 +265,3 @@ class HspySignal1D:
         gain_signal = self.__gain_file.gain.isig[gain_roi[0]:gain_roi[2], gain_roi[1]:gain_roi[3]].sum(axis=1)
 
         self.hspy_gd = self.hspy_gd*gain_signal_mean*vertical_bin/(gain_signal)
-
-
-class HspyGain(HspySignal1D):
-    def __init__(self, di):
-        super().__init__(di)
-
-    def rebin(self):
-        attr = self.di.description['averages']
-        initial = self.hspy_gd.axes_manager[0].offset
-        self.hspy_gd = self.hspy_gd.rebin(scale=[attr, 1])
-        self.hspy_gd.axes_manager[0].offset = initial
-
-    def get_gain_profile(self):
-        return self.get_di(isig=[-2.4, -1.8], sum_isig=True)
-
-    def get_gain_2d(self):
-        return self.get_di(isig=[-2.4, -1.8])

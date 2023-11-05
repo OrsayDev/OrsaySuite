@@ -89,8 +89,8 @@ class DriftCorrection:
     def displace_shifter_relative(self, instrument_id: str, dimension, value):
         self.__instrument = HardwareSource.HardwareSourceManager().get_instrument_by_id(instrument_id)
         if self.__instrument:
-            valx, valy = self.get_shifters(instrument_id)
-            self.__instrument.SetVal('CSH.u' if dimension == 0 else 'CSH.v', valx + value*1e-9)
+            to_add = self.get_shifters(instrument_id)[dimension]
+            self.__instrument.SetVal('CSH.u' if dimension == 0 else 'CSH.v', to_add + value*1e-9)
         else:
             logging.info("***Drift Correction***: TryGetVal and SetVal not implemented.")
 

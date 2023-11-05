@@ -111,18 +111,6 @@ class handler:
         self.event_loop.create_task(
             self.do_enable(True, ['init_pb']))
 
-    def bin_laser(self, widget):
-        self.__current_DI = None
-
-        self.__current_DI = self._pick_di()
-
-        if self.__current_DI:
-            self.gd = orsay_data.HspyGain(self.__current_DI.data_item)
-            self.gd.rebin()
-            self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
-        else:
-            logging.info('***PANEL***: Could not find referenced Data Item.')
-
     def correct_gain(self, widget):
         #Not yet implemented. Needs ROI and threshold in metadata
         self.__current_DI = None
@@ -145,28 +133,6 @@ class handler:
                 logging.info('***PANEL***: Not implemented. Needs to implement ROI and THRESHOLD from metadata')
             else:
                 logging.info('***PANEL***: No ' + metadata_name + ' metadata available for this data_item')
-        else:
-            logging.info('***PANEL***: Could not find referenced Data Item.')
-
-    def gain_profile_data_item(self, widget):
-        self.__current_DI = None
-
-        self.__current_DI = self._pick_di()
-
-        if self.__current_DI:
-            self.gd = orsay_data.HspyGain(self.__current_DI.data_item)
-            self.event_loop.create_task(self.data_item_show(self.gd.get_gain_profile()))
-        else:
-            logging.info('***PANEL***: Could not find referenced Data Item.')
-
-    def gain_profile_2d_data_item(self, widget):
-        self.__current_DI = None
-
-        self.__current_DI = self._pick_di()
-
-        if self.__current_DI:
-            self.gd = orsay_data.HspyGain(self.__current_DI.data_item)
-            self.event_loop.create_task(self.data_item_show(self.gd.get_gain_2d()))
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
@@ -203,6 +169,7 @@ class handler:
                 self.event_loop.create_task(self.data_item_show(result))
 
         def remove_background_action(hspy_signal, interval):
+            self.source_code_value.text = orsay_data.get_source_code(hspy_signal.remove_background)
             hspy_signal.remove_background(interval, which)
             self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
 
@@ -398,12 +365,6 @@ class handler:
             self.time_interval_manual_value.enabled = True
             self.__drift.abort()
 
-    # def reset_shifter(self, widget):
-    #     self.__drift.displace_shifter_reset(0)
-    #     self.__drift.displace_shifter_reset(1)
-    #     self.property_changed_event.fire("shifter_u")
-    #     self.property_changed_event.fire("shifter_v")
-
     def displace_shifter(self, widget):
         instrument_id = self.__drift.instrument_systems[self.instrument_selection_dd.current_index]
         if widget.text == 'Displace X':
@@ -436,16 +397,6 @@ class View:
 
         #General elements. Used often.
         self.close_par = ui.create_label(text=')')
-
-        #Gain group
-        self.bin_laser_pb = ui.create_push_button(text='Bin laser', name='bin_laser_pb', on_clicked='bin_laser')
-        self.profile_2d_pb = ui.create_push_button(text='2D Gain profile ', name='profile_2d_pb',
-                                                on_clicked='gain_profile_2d_data_item')
-        self.profile_pb = ui.create_push_button(text='Gain profile ', name='profile_pb', on_clicked='gain_profile_data_item')
-        self.pb_row = ui.create_row(self.bin_laser_pb, self.profile_2d_pb, self.profile_pb, ui.create_stretch())
-
-        self.d2_group = ui.create_group(title='EEGS Tools', content=ui.create_column(
-            self.pb_row, ui.create_stretch()))
 
         #General Group
         self.fit_text = ui.create_label(text='Fitting: ', name='fit_text')
@@ -506,12 +457,18 @@ class View:
             self.pb_row, self.decomposition_row, ui.create_stretch()
         ))
 
+        self.source_code_label=ui.create_label(name='source_code_label', text='Source code: ')
+        self.source_code_value=ui.create_label(name='source_code_value', text='Please perform an action')
+        self.source_code_group=ui.create_group(title='Meta', content=ui.create_column(self.source_code_label,
+                                                                                      self.source_code_value,
+                                                                                      ui.create_stretch()))
+
         self.last_text = ui.create_label(text='<a href="https://github.com/OrsayDev/OrsaySuite">Orsay Tools v0.1.0</a>', name='last_text')
         self.left_text = ui.create_label(text='<a href="https://hyperspy.org/hyperspy-doc/current/index.html">HyperSpy v1.7.5</a>', name='left_text')
         self.last_row = ui.create_row(self.left_text, ui.create_stretch(), self.last_text)
 
         self.hyperspytab = ui.create_tab(label = 'Processing', content = ui.create_column(self.general_group,
-                                        self.hspec_group, self.d2_group, self.last_row))
+                                        self.hspec_group, self.source_code_group, self.last_row))
 
         ##End of hyperspy data processing tab
         # Begin of cross-correlation tab
