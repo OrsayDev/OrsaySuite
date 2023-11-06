@@ -168,22 +168,16 @@ class HspySignal1D:
         loadings_stacked = hs.signals.Signal1D(
             self.hspy_gd.learning_results.loadings[:, :components].reshape(shape_loading[0], shape_loading[1], components).transpose())
 
-        # Calibrate factors
-        factors.axes_manager[1].name = "Energy"
-        factors.axes_manager[1].scale = self.hspy_gd.axes_manager[2].scale
-        factors.axes_manager[1].offset = self.hspy_gd.axes_manager[2].offset
-        factors.axes_manager[1].units = self.hspy_gd.axes_manager[2].units
+        #print(spim_dec.metadata.as_dictionary())
+        def calibrate_axes(temp, input_index, output_index):
+            temp.axes_manager[input_index].scale = self.hspy_gd.axes_manager[output_index].scale
+            temp.axes_manager[input_index].offset = self.hspy_gd.axes_manager[output_index].offset
+            temp.axes_manager[input_index].units = self.hspy_gd.axes_manager[output_index].units
 
-        # Calibrate loadings
-        loadings_stacked.axes_manager[1].name = "Width"
-        loadings_stacked.axes_manager[1].scale = self.hspy_gd.axes_manager[0].scale
-        loadings_stacked.axes_manager[1].offset = self.hspy_gd.axes_manager[0].offset
-        loadings_stacked.axes_manager[1].units = self.hspy_gd.axes_manager[0].units
-
-        loadings_stacked.axes_manager[2].name = "Height"
-        loadings_stacked.axes_manager[2].scale = self.hspy_gd.axes_manager[1].scale
-        loadings_stacked.axes_manager[2].offset = self.hspy_gd.axes_manager[1].offset
-        loadings_stacked.axes_manager[2].units = self.hspy_gd.axes_manager[1].units
+        # # Calibrate factors/loadings
+        calibrate_axes(factors, 1, 2)
+        calibrate_axes(loadings_stacked, 1, 0)
+        calibrate_axes(loadings_stacked, 2, 1)
 
         return [
             self._get_data(variance, 'PCAvar' + str(components) + '_'),

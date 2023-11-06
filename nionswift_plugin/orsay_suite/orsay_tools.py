@@ -142,14 +142,17 @@ class handler:
         self.__current_DI = self._pick_di() #Single Data Item here
 
         def correct_junction(hspy_signal):
+            self.source_code_value.text = orsay_data.get_source_code(hspy_signal.detector_junctions)
             corrected_data = hspy_signal.detector_junctions()
             self.event_loop.create_task(self.data_item_show(corrected_data))
 
         def flip_signal(hspy_signal):
+            self.source_code_value.text = orsay_data.get_source_code(hspy_signal.flip)
             hspy_signal.flip()
             self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
 
         def data_bin(hspy_signal):
+            self.source_code_value.text = orsay_data.get_source_code(hspy_signal.rebin)
             x = int(self.x_le.text)
             y = int(self.y_le.text)
             E = int(self.E_le.text)
@@ -157,13 +160,16 @@ class handler:
             self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
 
         def align_zlp_action(hspy_signal, interval):
+            self.source_code_value.text = orsay_data.get_source_code(hspy_signal.align_zlp_signal_range)
             hspy_signal.align_zlp_signal_range(interval)
             self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
 
         def fitting_action(hspy_signal, interval):
             if which == 'gaussian':
+                self.source_code_value.text = orsay_data.get_source_code(hspy_signal.plot_gaussian)
                 results = hspy_signal.plot_gaussian(interval)
             elif which == 'lorentzian':
+                self.source_code_value.text = orsay_data.get_source_code(hspy_signal.plot_lorentzian)
                 results = hspy_signal.plot_lorentzian(interval)
             for result in results:
                 self.event_loop.create_task(self.data_item_show(result))
@@ -175,16 +181,19 @@ class handler:
 
         def deconvolve_hyperspec(hspy_signal, reference_spec):
             if which == 'rl':
+                self.source_code_value.text = orsay_data.get_source_code(hspy_signal.deconvolution)
                 new_di = hspy_signal.deconvolution(reference_spec, 'Richardson lucy', int(self.int_le.text))
             self.event_loop.create_task(self.data_item_show(new_di))
 
         def decomposition_action(hspy_signal, *args):
             if which == 'pca_mask':
+                self.source_code_value.text = orsay_data.get_source_code(hspy_signal.signal_decomposition)
                 interval = args[0]
                 results = hspy_signal.signal_decomposition(range = interval,
                                                                                           components=int(self.comp_le.text),
                                                                                           mask=True)
             elif which == 'pca':
+                self.source_code_value.text = orsay_data.get_source_code(hspy_signal.signal_decomposition)
                 results = hspy_signal.signal_decomposition(components=int(self.comp_le.text),
                                                                                           mask=False)
             for result in results:
@@ -211,35 +220,42 @@ class handler:
 
         if self.__current_DI:
             self.gd = orsay_data.HspySignal1D(self.__current_DI.data_item)
+
+            #Searching for graphics in the data_item
+            val = None
             for graphic in self.__current_DI.graphics:
-                if graphic.type == 'rect-graphic':  # This is a hyperspectral image
-                    action(self.gd)
-                if graphic.type == 'line-profile-graphic':  # This is Chrono
+                if graphic.type == 'line-profile-graphic':
                     val = (graphic.start[1], graphic.end[1])
-                    action(self.gd, val)
-                    return
                 if graphic.type == 'interval-graphic':  # This is 1D
                     val = graphic.interval
+            #Applying the action to either 2D or 1D objects.
+            if self.gd.nav_len == 2: #No windows are taken
+                action(self.gd)
+            elif self.gd.nav_len == 1 or self.gd.nav_len == 0:
+                if val is not None:
                     action(self.gd, val)
+                    return
+                action(self.gd)
         else:
             dis = self._pick_dis()  # Multiple data items
             interval_spec = list()
             if dis and len(dis) == 2:
-                spec = dis[1]
-                hspec = dis[0]
+                hspec, spec = dis[0], dis[1]
+                self.gd = orsay_data.HspySignal1D(hspec.data_item)
+                #Searching for an interval
+                interval_spec = None
                 for graphic in spec.graphics:
                     if graphic.type == 'interval-graphic':
                         interval_spec = graphic.interval
-                for graphic in hspec.graphics:
-                    if graphic.type == 'rect-graphic' and len(interval_spec) == 2: #interval_spec is an interval
-                        self.gd = orsay_data.HspySignal1D(hspec.data_item)
+                #Applying action to the hyperspectrum
+                if self.gd.nav_len == 2:
+                    if interval_spec is not None:
                         action(self.gd, interval_spec)
                         return
-                    #If there is no interval, pass the reference spectrum entirely
-                    self.gd = orsay_data.HspySignal1D(hspec.data_item)
-                    ref_spec = orsay_data.HspySignal1D(spec.data_item)
-                    action(self.gd, ref_spec)
-                    return
+                    else:
+                        ref_spec = orsay_data.HspySignal1D(spec.data_item)
+                        action(self.gd, ref_spec)
+                        return
             else:
                 logging.info('***PANEL***: Could not find referenced Data Item.')
 
@@ -458,10 +474,8 @@ class View:
         ))
 
         self.source_code_label=ui.create_label(name='source_code_label', text='Source code: ')
-        self.source_code_value=ui.create_label(name='source_code_value', text='Please perform an action')
-        self.source_code_group=ui.create_group(title='Meta', content=ui.create_column(self.source_code_label,
-                                                                                      self.source_code_value,
-                                                                                      ui.create_stretch()))
+        self.source_code_value=ui.create_text_edit(name='source_code_value')
+        self.source_code_group=ui.create_group(title='Meta', content=ui.create_column(self.source_code_value))
 
         self.last_text = ui.create_label(text='<a href="https://github.com/OrsayDev/OrsaySuite">Orsay Tools v0.1.0</a>', name='last_text')
         self.left_text = ui.create_label(text='<a href="https://hyperspy.org/hyperspy-doc/current/index.html">HyperSpy v1.7.5</a>', name='left_text')
