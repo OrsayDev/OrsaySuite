@@ -1,5 +1,5 @@
 # OrsaySuite
-Data analysis in Nionswift using Hyperspy
+Data analysis & drift correction in Nionswift using Hyperspy
 
 ## Installation
 
@@ -18,6 +18,14 @@ Install OrsaySuite with ``pip`` by using:
 ``pip install -e .``
 
 Now, running Nionswift as ``nionswift`` will show you a window called Orsay Tools.
+
+If you want to run the drift correction, you need to have the `nion-instrumentation-kit` installed (be aware of the syntax difference):
+
+``pip install nionswift-instrumentation``
+
+If you are not working on an actual microscope, you may want to test it with a simulated instrument, in which case you should instal:
+
+``pip install nionswift-usim``
 
 ## Contributing
 
