@@ -14,6 +14,7 @@ class DriftCorrection:
         self.cross_fft = numpy.zeros((256, 256))
         self.scan_systems = list()
         self.instrument_systems = list()
+        self.scan_channels = dict()
         self.__array_index = 0
         self.__interval = 2
         self.__static_reference = False
@@ -24,35 +25,25 @@ class DriftCorrection:
         for hards in HardwareSource.HardwareSourceManager().hardware_sources:  # finding eels camera. If you don't
             if isinstance(hards, nion.instrumentation.scan_base.ConcreteScanHardwareSource):
                 self.scan_systems.append(hards.hardware_source_id)
+                channels = list()
+                for index in range(hards.get_channel_count()): channels.append(hards.get_channel_name(index))
+                self.scan_channels[hards] = channels
 
         #Checking the available instruments
         my_insts = Registry.get_components_by_type("stem_controller")
         for counter, my_inst in enumerate(list(my_insts)):
             self.instrument_systems.append(my_inst.instrument_id)
 
-        # # Checking if auto_stem is here. This is to control a Nion microscope
-        # AUTOSTEM_CONTROLLER_ID = "autostem_controller"
-        # self.__isChromaTEM = False
-        # autostem = HardwareSource.HardwareSourceManager().get_instrument_by_id(AUTOSTEM_CONTROLLER_ID)
-        # if autostem != None:
-        #     tuning_manager = autostem.tuning_manager
-        #     self.__instrument = tuning_manager.instrument_controller
-        #     self.__isChromaTEM = True
-        #     logging.info("*** Drift Correction ***: autostem_controller is found.")
-        # else:
-        #     self.__instrument = HardwareSource.HardwareSourceManager().get_instrument_by_id("orsay_controller")
-        #     logging.info("*** Drift Correction ***: VG_controller is found.")
-
-        #self.__instrument = None if (len(self.instrument_systems)==0) else self.instrument_systems[0]
-        #self.__offset_valx, self.__offset_valy = self.get_shifters()
+        self.__instrument = None if (len(self.instrument_systems)==0) else \
+            HardwareSource.HardwareSourceManager().get_instrument_by_id(self.instrument_systems[0])
 
     def abort(self):
         self.__abort = True
 
-    def start(self, callback, scan_system, instrument_system, interval, static_reference, should_correct, manual_correction, manual_correction_values):
+    def start(self, callback, scan_system_index, instrument_system_index, interval, static_reference, should_correct, manual_correction, manual_correction_values):
         self.__scan = HardwareSource.HardwareSourceManager().get_hardware_source_for_hardware_source_id(
-            scan_system)
-        self.__instrument = HardwareSource.HardwareSourceManager().get_instrument_by_id(instrument_system)
+            self.scan_systems[scan_system_index])
+        self.__instrument = HardwareSource.HardwareSourceManager().get_instrument_by_id(self.instrument_systems[instrument_system_index])
         try:
             self.__interval = float(interval)
             self.__static_reference = static_reference
@@ -79,17 +70,17 @@ class DriftCorrection:
         else:
             self.__array_index = self.__array_index + 1
 
-    def get_shifters(self, instrument_id: str):
-        self.__instrument = HardwareSource.HardwareSourceManager().get_instrument_by_id(instrument_id)
+    def get_shifters(self):
         if self.__instrument:
             return (self.__instrument.TryGetVal('CSH.u')[1], self.__instrument.TryGetVal('CSH.v')[1])
         else:
             logging.info("***Drift Correction***: TryGetVal and SetVal not implemented.")
 
-    def displace_shifter_relative(self, instrument_id: str, dimension, value):
-        self.__instrument = HardwareSource.HardwareSourceManager().get_instrument_by_id(instrument_id)
+    def displace_shifter_relative(self, dimension, value, **kwargs):
+        if "instrument_id" in kwargs:
+            self.__instrument = HardwareSource.HardwareSourceManager().get_instrument_by_id(kwargs['instrument_id'])
         if self.__instrument:
-            to_add = self.get_shifters(instrument_id)[dimension]
+            to_add = self.get_shifters()[dimension]
             self.__instrument.SetVal('CSH.u' if dimension == 0 else 'CSH.v', to_add + value*1e-9)
         else:
             logging.info("***Drift Correction***: TryGetVal and SetVal not implemented.")
@@ -99,8 +90,7 @@ class DriftCorrection:
 
     def thread_manual_func(self, manual_correction_values):
         x_val, y_val = manual_correction_values
-        x_val = float(x_val)
-        y_val = float(y_val)
+        x_val, y_val = float(x_val), float(y_val)
         time_correction = 0
         while not self.__abort:
             start = time.time()
@@ -114,6 +104,8 @@ class DriftCorrection:
     def thread_func(self, callback):
         time_correction = 0
         reference_image = self.__scan.grab_next_to_finish()
+        #TODO: search the correct channel index based on the scan selection drop down from user
+        #channel_name = reference_image[0].metadata['channel_name'] #or channel_index
         while not self.__abort:
             start = time.time()
             self.check_and_wait()
@@ -131,10 +123,7 @@ class DriftCorrection:
                     xdrift,
                     ydrift
                 )
-                #xdrift = reference_image[0].get_dimensional_calibration(0).scale * (xindex - int(corr.shape[0] / 2))
-                #ydrift = reference_image[0].get_dimensional_calibration(1).scale * (xindex - int(corr.shape[1] / 2))
-                #logging.info(f'***Drift Correction***: Drift.x {xdrift} (nm/s). Drift.y: {ydrift} (nm/s). '
-                #             f'Interval: {end - start} (s).')
+
                 if self.__should_correct:
                     self.displace_shifter_relative(0, - 0.8 * xdrift * (self.__interval + time_correction))
                     self.displace_shifter_relative(1, - 0.8 * ydrift * (self.__interval + time_correction))
@@ -145,9 +134,6 @@ class DriftCorrection:
                              f'Restart drift correction for proper calibration.')
             if not self.__static_reference: reference_image = new_image
             end = time.time()
-            logging.info(f'***Drift Correction***: Drift.x {xdrift} (nm/s). Drift.y: {ydrift} (nm/s). '
+            logging.info(f'***Drift Correction***: Drift.x {xdrift, xindex} (nm/s). Drift.y: {ydrift, yindex} (nm/s). '
                          f'Interval: {end - start} (s).')
             time_correction = end - start - self.__interval
-
-
-

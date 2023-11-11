@@ -83,6 +83,10 @@ class handler:
         self.manual_drift_y_value.text = '1.0'
         self.scan_selection_dd.items = self.__drift.scan_systems
         self.instrument_selection_dd.items = self.__drift.instrument_systems
+        try:
+            self.scan_channel_selection_dd.items = next(iter(self.__drift.scan_channels.values()))
+        except StopIteration:
+            logging.info('***Drift Correction***: No channel has been found.')
 
     async def data_item_show(self, DI):
         self.document_controller.document_model.append_data_item(DI)
@@ -309,8 +313,10 @@ class handler:
     def activate_cross_correlation(self, widget):
         if 'Measure' in widget.text:
             should_correct = 'Correct' in widget.text
-            if not self.__drift.start(self._update_cross_correlation, self.__drift.scan_systems[self.scan_selection_dd.current_index],
-                                      self.__drift.instrument_systems[self.instrument_selection_dd.current_index], self.time_interval_value.text,
+            scan_index = self.scan_selection_dd.current_index
+            instrument_index = self.instrument_selection_dd.current_index
+            if not self.__drift.start(self._update_cross_correlation, scan_index,
+                                      instrument_index, self.time_interval_value.text,
                                self.static_reference_pb.checked, should_correct, False, (self.manual_drift_x_value.text, self.manual_drift_y_value.text)):
                 self.note_label.text = 'Status: Not running (activate scan channel)'
                 return
@@ -357,8 +363,6 @@ class handler:
         self.__crossx_di.update_data_only(self.__drift.datax)
         self.__crossy_di.update_data_only(self.__drift.datay)
         if self.__fft_show: self.__cross_fft.update_data_only(self.__drift.cross_fft)
-        self.property_changed_event.fire("drift_u")
-        self.property_changed_event.fire("drift_v")
         self.property_changed_event.fire("shifter_u")
         self.property_changed_event.fire("shifter_v")
 
@@ -381,30 +385,36 @@ class handler:
             self.time_interval_manual_value.enabled = True
             self.__drift.abort()
 
+    def change_scan_system(self, widget, **kwargs):
+        if widget == self.scan_selection_dd:
+            my_iter = iter(self.__drift.scan_channels.values())
+            for _ in range(int(kwargs['current_index'] + 1)):
+                self.scan_channel_selection_dd.items = next(my_iter)
+
     def displace_shifter(self, widget):
         instrument_id = self.__drift.instrument_systems[self.instrument_selection_dd.current_index]
         if widget.text == 'Displace X':
-            self.__drift.displace_shifter_relative(instrument_id, 0, float(self.calib_shifter_dim1_value.text))
+            self.__drift.displace_shifter_relative(0, float(self.calib_shifter_dim1_value.text), instrument_id = instrument_id)
         if widget.text == 'Displace Y':
-            self.__drift.displace_shifter_relative(instrument_id, 1, float(self.calib_shifter_dim2_value.text))
+            self.__drift.displace_shifter_relative(1, float(self.calib_shifter_dim2_value.text), instrument_id = instrument_id)
         self.property_changed_event.fire("shifter_u")
         self.property_changed_event.fire("shifter_v")
 
     @property
     def shifter_u(self):
         try:
-            instrument_id = self.__drift.instrument_systems[self.instrument_selection_dd.current_index]
-            return round(self.__drift.get_shifters(instrument_id)[0]*1e9, 3)
+            return round(self.__drift.get_shifters()[0]*1e9, 3)
         except IndexError:
             logging.info('***Drift Correction***: No instrument has been found.')
+            return 'None'
 
     @property
     def shifter_v(self):
         try:
-            instrument_id = self.__drift.instrument_systems[self.instrument_selection_dd.current_index]
-            return round(self.__drift.get_shifters(instrument_id)[1]*1e9, 3)
+            return round(self.__drift.get_shifters()[1]*1e9, 3)
         except IndexError:
             logging.info('***Drift Correction***: No instrument has been found.')
+            return 'None'
 
 class View:
 
@@ -489,14 +499,18 @@ class View:
 
         #Scan Engine & instrument
         self.scan_selection_label = ui.create_label(text='Choose the scan system: ')
-        self.scan_selection_dd = ui.create_combo_box(name='scan_selection_dd', items=['None'])
+        self.scan_selection_dd = ui.create_combo_box(name='scan_selection_dd', items=['None'], on_current_index_changed='change_scan_system')
         self.first_row = ui.create_row(self.scan_selection_label, self.scan_selection_dd, ui.create_stretch())
+
+        self.scan_channel_selection_label = ui.create_label(text='Choose the scan system: ')
+        self.scan_channel_selection_dd = ui.create_combo_box(name='scan_channel_selection_dd', items=['None'])
+        self.scan_channel_selection_row = ui.create_row(self.scan_channel_selection_label, self.scan_channel_selection_dd, ui.create_stretch())
 
         self.instrument_selection_label = ui.create_label(text='Choose the instrument system: ')
         self.instrument_selection_dd = ui.create_combo_box(name='instrument_selection_dd', items=['None'])
         self.instrument_row = ui.create_row(self.instrument_selection_label, self.instrument_selection_dd, ui.create_stretch())
         self.first_group = ui.create_group(title='Scan Engine', content=ui.create_column(self.instrument_row,
-                                                                                         self.first_row))
+                                                                                         self.first_row, self.scan_channel_selection_row))
 
         #Automatic Correction
         self.act_corr_pushb = ui.create_push_button(name='act_corr_pushb', text='Measure', on_clicked='activate_cross_correlation')
