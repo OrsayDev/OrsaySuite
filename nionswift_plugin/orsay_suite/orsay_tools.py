@@ -22,6 +22,9 @@ import numpy
 
 _ = gettext.gettext
 
+BACKGROUND_REMOVAL = [ 'PowerLaw', 'Offset', 'Doniach', 'Gaussian', 'Lorentzian', 'Polynomial', 'Exponential',
+                      'SkewNormal', 'SplitVoigt', 'Voigt']
+
 class DataItemCreation():
     def __init__(self, name, array, signal_dim, offset: list, scale: list, units: list, **kwargs):
         self.metadata = kwargs
@@ -117,6 +120,7 @@ class handler:
 
     def correct_gain(self, widget):
         #Not yet implemented. Needs ROI and threshold in metadata
+        raise NotImplementedError("Functionality currently not implemented. Please be back later.")
         self.__current_DI = None
 
         self.__current_DI = self._pick_di()
@@ -131,75 +135,72 @@ class handler:
                 threshold = 20 #NOT IMPLEMENTED: must come from metadata
                 gain_roi = [0, 0, 1024, 64] #NOT IMPLEMENTED: must come from metadata
                 #current implentation is x0, y0, x1, y1. CHECK IF TRUE LATER in metadata
-                self.gd.correct_gain_hs(ht, threshold, gain_roi)
-
-                self.event_loop.create_task(self.data_item_show(self.gd.get_di()))
+                results = self.gd.correct_gain_hs(ht, threshold, gain_roi)
+                for result in results:
+                    self.event_loop.create_task(self.data_item_show(result))
                 logging.info('***PANEL***: Not implemented. Needs to implement ROI and THRESHOLD from metadata')
             else:
                 logging.info('***PANEL***: No ' + metadata_name + ' metadata available for this data_item')
         else:
             logging.info('***PANEL***: Could not find referenced Data Item.')
 
-    def _general_actions(self, type, which):
+    def _general_actions(self, type, which, **kwargs):
         self.__current_DI = None
-
         self.__current_DI = self._pick_di() #Single Data Item here
 
-        def correct_junction(hspy_signal):
-            self.source_code_value.text = orsay_data.get_source_code(hspy_signal.detector_junctions)
+        def correct_junction_action(hspy_signal):
             corrected_data = hspy_signal.detector_junctions()
             self.event_loop.create_task(self.data_item_show(corrected_data))
 
-        def flip_signal(hspy_signal):
-            self.source_code_value.text = orsay_data.get_source_code(hspy_signal.flip)
-            hspy_signal.flip()
-            self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
+        def flip_signal_action(hspy_signal):
+            results = hspy_signal.flip()
+            for result in results:
+                self.event_loop.create_task(self.data_item_show(result))
 
-        def data_bin(hspy_signal):
-            self.source_code_value.text = orsay_data.get_source_code(hspy_signal.rebin)
-            x = int(self.x_le.text)
-            y = int(self.y_le.text)
-            E = int(self.E_le.text)
-            hspy_signal.rebin(scale=[x, y, E])
-            self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
+        def data_bin_action(hspy_signal):
+            x = kwargs['x']
+            y = kwargs['y']
+            E = kwargs['E']
+            results = hspy_signal.rebin(scale=[x, y, E])
+            for result in results:
+                self.event_loop.create_task(self.data_item_show(result))
 
         def align_zlp_action(hspy_signal, interval):
-            self.source_code_value.text = orsay_data.get_source_code(hspy_signal.align_zlp_signal_range)
-            hspy_signal.align_zlp_signal_range(interval)
-            self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
+            results = hspy_signal.align_zlp_signal_range(interval)
+            for result in results:
+                self.event_loop.create_task(self.data_item_show(result))
 
         def fitting_action(hspy_signal, interval):
             if which == 'gaussian':
-                self.source_code_value.text = orsay_data.get_source_code(hspy_signal.plot_gaussian)
                 results = hspy_signal.plot_gaussian(interval)
             elif which == 'lorentzian':
-                self.source_code_value.text = orsay_data.get_source_code(hspy_signal.plot_lorentzian)
                 results = hspy_signal.plot_lorentzian(interval)
             for result in results:
                 self.event_loop.create_task(self.data_item_show(result))
 
         def remove_background_action(hspy_signal, interval):
-            self.source_code_value.text = orsay_data.get_source_code(hspy_signal.remove_background)
-            hspy_signal.remove_background(interval, which)
-            self.event_loop.create_task(self.data_item_show(hspy_signal.get_di()))
+            results = hspy_signal.remove_background(interval, which)
+            for result in results:
+                self.event_loop.create_task(self.data_item_show(result))
 
         def deconvolve_hyperspec(hspy_signal, reference_spec):
             if which == 'rl':
-                self.source_code_value.text = orsay_data.get_source_code(hspy_signal.deconvolution)
-                new_di = hspy_signal.deconvolution(reference_spec, 'Richardson lucy', int(self.int_le.text))
-            self.event_loop.create_task(self.data_item_show(new_di))
+                interactions = kwargs['interactions']
+                if not isinstance(reference_spec, orsay_data.HspySignal1D):
+                    raise AttributeError("A reference spectra is expected. Maybe an interval is selected?")
+                results = hspy_signal.deconvolution(reference_spec, 'Richardson lucy', interactions)
+            for result in results:
+                self.event_loop.create_task(self.data_item_show(result))
 
-        def decomposition_action(hspy_signal, *args):
+        def decomposition_action_masked(hspy_signal, interval):
             if which == 'pca_mask':
-                self.source_code_value.text = orsay_data.get_source_code(hspy_signal.signal_decomposition)
-                interval = args[0]
-                results = hspy_signal.signal_decomposition(range = interval,
-                                                                                          components=int(self.comp_le.text),
-                                                                                          mask=True)
-            elif which == 'pca':
-                self.source_code_value.text = orsay_data.get_source_code(hspy_signal.signal_decomposition)
-                results = hspy_signal.signal_decomposition(components=int(self.comp_le.text),
-                                                                                          mask=False)
+                results = hspy_signal.signal_decomposition(range=interval,components=kwargs['components'], mask=True)
+            for result in results:
+                self.event_loop.create_task(self.data_item_show(result))
+
+        def decomposition_action(hspy_signal):
+            if which == 'pca':
+                results = hspy_signal.signal_decomposition(components=kwargs['components'], mask=False)
             for result in results:
                 self.event_loop.create_task(self.data_item_show(result))
 
@@ -209,16 +210,18 @@ class handler:
             action = remove_background_action
         elif type == 'decomposition':
             action = decomposition_action
+        elif type == 'decomposition_masked':
+            action = decomposition_action_masked
         elif type == 'align_zlp':
             action = align_zlp_action
         elif type == 'correct_junctions':
-            action = correct_junction
+            action = correct_junction_action
         elif type == 'flip_signal':
-            action = flip_signal
+            action = flip_signal_action
         elif type == 'deconvolve':
             action = deconvolve_hyperspec
         elif type == 'data_bin':
-            action = data_bin
+            action = data_bin_action
         else:
             raise Exception("***PANEL***: No action function was selected. Please check the correct type.")
 
@@ -264,43 +267,53 @@ class handler:
                 logging.info('***PANEL***: Could not find referenced Data Item.')
 
     #Not used for now, but will be implemented soon
-    def _thread_manager(self, args):
+    def _thread_manager(self, args, **kwargs):
         if not self.__actionThread.is_alive():
-            self.__actionThread = threading.Thread(target=self._general_actions, args=args)
+            self.__actionThread = threading.Thread(target=self._general_actions, args=args, kwargs=kwargs)
             self.__actionThread.start()
+        else:
+            raise Exception("A process is already taken place. Wait for it to end.")
+
     def correct_junctions(self, widget):
-        #self._thread_manager(('correct_junctions', 'None'))
-        self._general_actions('correct_junctions', 'None')
+        self.source_code_value.text = orsay_data.get_source_code(orsay_data.HspySignal1D.detector_junctions)
+        self._thread_manager(('correct_junctions', 'None'))
+
     def flip_signal(self, widget):
-        #self._thread_manager(('flip_signal', 'None'))
-        self._general_actions('flip_signal', 'None')
-    def remove_background_pl(self, widget):
-        #self._thread_manager(('remove_background', 'Power law'))
-        self._general_actions('remove_background', 'Power law')
-    def remove_background_off(self, widget):
-        #self._thread_manager(('remove_background', 'Offset'))
-        self._general_actions('remove_background', 'Offset')
+        self.source_code_value.text = orsay_data.get_source_code(orsay_data.HspySignal1D.flip)
+        self._thread_manager(('flip_signal', 'None'))
+
+    def remove_background(self, widget):
+        self.source_code_value.text = orsay_data.get_source_code(orsay_data.HspySignal1D.remove_background)
+        self._thread_manager(('remove_background', self.remove_background_combo.current_item))
+
     def deconvolve_rl_hspec(self, widget):
-        #self._thread_manager(('deconvolve', 'rl'))
-        self._general_actions('deconvolve', 'rl')
+        self.source_code_value.text = orsay_data.get_source_code(orsay_data.HspySignal1D.deconvolution)
+        self._thread_manager(('deconvolve', 'rl'), interactions=int(self.int_le.text))
+
     def fit_gaussian(self, widget):
-        #self._thread_manager(('fitting', 'gaussian'))
-        self._general_actions('fitting', 'gaussian')
+        self.source_code_value.text = orsay_data.get_source_code(orsay_data.HspySignal1D.plot_gaussian)
+        self._thread_manager(('fitting', 'gaussian'))
+
     def fit_lorentzian(self, widget):
-        #self._thread_manager(('fitting', 'lorentzian'))
-        self._general_actions('fitting', 'lorentzian')
+        self.source_code_value.text = orsay_data.get_source_code(orsay_data.HspySignal1D.plot_lorentzian)
+        self._thread_manager(('fitting', 'lorentzian'))
+
     def align_zlp(self, widget):
-        #self._thread_manager(('align_zlp', 'None'))
-        self._general_actions('align_zlp', 'None')
+        self.source_code_value.text = orsay_data.get_source_code(orsay_data.HspySignal1D.align_zlp_signal_range)
+        self._thread_manager(('align_zlp', 'None'))
+
     def pca_mask(self, widget):
-        #self._thread_manager(('decomposition', 'pca_mask'))
-        self._general_actions('decomposition', 'pca_mask')
+        self.source_code_value.text = orsay_data.get_source_code(orsay_data.HspySignal1D.signal_decomposition)
+        self._thread_manager(('decomposition_masked', 'pca_mask'), components=int(self.comp_le.text))
+
     def pca(self, widget):
-        #self._thread_manager(('decomposition', 'pca'))
-        self._general_actions('decomposition', 'pca')
+        self.source_code_value.text = orsay_data.get_source_code(orsay_data.HspySignal1D.signal_decomposition)
+        self._thread_manager(('decomposition', 'pca'), components=int(self.comp_le.text))
+
     def hspy_bin(self, widget):
-        #self._thread_manager(('data_bin', 'None'))
-        self._general_actions('data_bin', 'None')
+        self.source_code_value.text = orsay_data.get_source_code(orsay_data.HspySignal1D.rebin)
+        self._thread_manager(('data_bin', 'None'), x=int(self.x_le.text), y=int(self.y_le.text), E=int(self.E_le.text))
+
 
     def _pick_di(self):
         display_item = self.document_controller.selected_display_item
@@ -439,9 +452,9 @@ class View:
                                               on_clicked='flip_signal')
 
         self.background_text = ui.create_label(text='Background Removal: ', name='background_text')
-        self.remove_pl_pb = ui.create_push_button(text='Power Law', name='remove_pl_pb', on_clicked='remove_background_pl')
-        self.remove_pl_offset = ui.create_push_button(text='Offset', name='remove_off_pb',
-                                                  on_clicked='remove_background_off')
+        self.remove_background_combo = ui.create_combo_box(items=BACKGROUND_REMOVAL, name='remove_background_combo')
+        self.remove_background_pb = ui.create_push_button(text='Do it.', name='remove_background_pb',
+                                                          on_clicked='remove_background')
 
         self.binning_text = ui.create_label(text='Bin data (x, y, E): (', name='binning_text')
         self.x_le = ui.create_line_edit(name='x_le', width=25)
@@ -451,7 +464,8 @@ class View:
 
         self.pb_row = ui.create_row(self.simple_text, self.cj_pb, self.align_zlp_pb, self.cgain_pb,
                                     self.flip_pb, ui.create_stretch())
-        self.pb_remove = ui.create_row(self.background_text, self.remove_pl_pb, self.remove_pl_offset, ui.create_stretch())
+        self.pb_remove = ui.create_row(self.background_text, self.remove_background_combo, self.remove_background_pb,
+                                       ui.create_stretch())
         self.pb_row_fitting = ui.create_row(self.fit_text, self.fit_gaussian_pb, self.fit_lorentzian_pb,
                                             ui.create_stretch())
         self.binning_row = ui.create_row(self.binning_text, self.x_le, self.y_le,
@@ -483,6 +497,8 @@ class View:
             self.pb_row, self.decomposition_row, ui.create_stretch()
         ))
 
+        ##End of hyperspy data processing tab
+        #Meta group
         self.source_code_label=ui.create_label(name='source_code_label', text='Source code: ')
         self.source_code_value=ui.create_text_edit(name='source_code_value')
         self.source_code_group=ui.create_group(title='Meta', content=ui.create_column(self.source_code_value))
@@ -494,7 +510,7 @@ class View:
         self.hyperspytab = ui.create_tab(label = 'Processing', content = ui.create_column(self.general_group,
                                         self.hspec_group, self.source_code_group, self.last_row))
 
-        ##End of hyperspy data processing tab
+        #End of Meta group
         # Begin of cross-correlation tab
 
         #Scan Engine & instrument

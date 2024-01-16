@@ -1,4 +1,4 @@
-import os, logging, inspect
+import inspect
 
 import numpy
 from nion.data import Calibration
@@ -33,27 +33,29 @@ class HspySignal1D:
             self.hspy_gd.axes_manager[index].units = di.dimensional_calibrations[index].units
 
     #Methods that modify the hyperspy object
-    def flip(self) -> None:
+    def flip(self) -> list:
         signal_axis = len(self.hspy_gd.data.shape)-1
         self.hspy_gd.data = numpy.flip(self.hspy_gd.data, axis=signal_axis)
+        return [self._get_data(self.hspy_gd, 'flip_')]
 
-    def interpolate(self) -> None:
-        self.hspy_gd.interpolate_in_between(256 - 1, 256 + 1, show_progressbar=False)
-        self.hspy_gd.interpolate_in_between(256*2 - 1, 256*2 + 1, show_progressbar=False)
-        self.hspy_gd.interpolate_in_between(256*3 - 1, 256*3 + 1, show_progressbar=False)
+    # def interpolate(self) -> None:
+    #     self.hspy_gd.interpolate_in_between(256 - 1, 256 + 1, show_progressbar=False)
+    #     self.hspy_gd.interpolate_in_between(256*2 - 1, 256*2 + 1, show_progressbar=False)
+    #     self.hspy_gd.interpolate_in_between(256*3 - 1, 256*3 + 1, show_progressbar=False)
 
-    def rebin(self, scale) -> None:
+    def rebin(self, scale) -> list:
         if self.nav_len == 0:
-            self.hspy_gd = self.hspy_gd.rebin(scale=[scale[2]])
+            return [self._get_data(self.hspy_gd.rebin(scale=[scale[2]]), 'align_zlp_')]
         elif self.nav_len == 1:
-            self.hspy_gd = self.hspy_gd.rebin(scale=[scale[1], scale[2]])
+            return [self._get_data(self.hspy_gd.rebin(scale=[scale[1], scale[2]]), 'align_zlp_')]
         elif self.nav_len == 2:
-            self.hspy_gd = self.hspy_gd.rebin(scale=scale)
+            return [self._get_data(self.hspy_gd.rebin(scale=scale), 'align_zlp_')]
 
-    def align_zlp_signal_range(self, range) -> None:
+    def align_zlp_signal_range(self, range) -> list:
         r1 = self._rel_to_abs(range[0])
         r2 = self._rel_to_abs(range[1])
-        self.hspy_gd.align_zero_loss_peak(subpixel=False, show_progressbar=False, signal_range=[r1, r2])
+        self.hspy_gd.align_zero_loss_peak(subpixel=False, show_progressbar=True, signal_range=[r1, r2])
+        return [self._get_data(self.hspy_gd, 'align_zlp_')]
 
     def _get_data(self, temp_data, prefix, is_sequence = False, collection_dimension = None, datum_dimension = None) -> DataItem.DataItem:
         timezone = Utility.get_local_timezone()
@@ -69,9 +71,12 @@ class HspySignal1D:
             data_descriptor = None
         else:
             data_descriptor = DataAndMetadata.DataDescriptor(is_sequence, collection_dimension, datum_dimension)
+
+        metadata = self.di.metadata
+        metadata["extra"] = temp_data.metadata.as_dictionary()
         xdata = DataAndMetadata.new_data_and_metadata(temp_data.data, calibration, dimensional_calibrations,
                                                       data_descriptor=data_descriptor,
-                                                      metadata=self.di.metadata,
+                                                      metadata=metadata,
                                                       timezone=timezone, timezone_offset=timezone_offset)
         data_item = DataItem.DataItem()
         data_item.set_xdata(xdata)
@@ -83,30 +88,32 @@ class HspySignal1D:
 
         return data_item
 
-    def get_di(self, inav=None, isig=None, sum_inav=None, sum_isig=None):
-        temp_data = self.hspy_gd
-        nav_len = len(temp_data.data.shape)-1
-        if inav is not None:
-            assert nav_len == len(inav)
-            if nav_len == 0:
-                pass
-            elif nav_len == 1:
-                temp_data = temp_data.inav[inav[0]: inav[1]]
-            elif nav_len == 2:
-                temp_data = temp_data.inav[inav[0][0]: inav[0][1], inav[1][0]: inav[1][1]]
-        if isig is not None:
-            temp_data = temp_data.isig[isig[0]: isig[1]]
-        if sum_inav:
-            temp_data = temp_data.sum(axis=0)
-        if sum_isig:
-            temp_data = temp_data.sum(axis=1)
+    # def get_di(self, inav=None, isig=None, sum_inav=None, sum_isig=None):
+    #     temp_data = self.hspy_gd
+    #     nav_len = len(temp_data.data.shape)-1
+    #     if inav is not None:
+    #         assert nav_len == len(inav)
+    #         if nav_len == 0:
+    #             pass
+    #         elif nav_len == 1:
+    #             temp_data = temp_data.inav[inav[0]: inav[1]]
+    #         elif nav_len == 2:
+    #             temp_data = temp_data.inav[inav[0][0]: inav[0][1], inav[1][0]: inav[1][1]]
+    #     if isig is not None:
+    #         temp_data = temp_data.isig[isig[0]: isig[1]]
+    #     if sum_inav:
+    #         temp_data = temp_data.sum(axis=0)
+    #     if sum_isig:
+    #         temp_data = temp_data.sum(axis=1)
+    #
+    #     return self._get_data(temp_data, 'processed_')
 
-        return self._get_data(temp_data, 'processed_')
-
-    def remove_background(self, range, which) -> None:
+    def remove_background(self, range, which) -> list:
         r1 = self._rel_to_abs(range[0])
         r2 = self._rel_to_abs(range[1])
-        self.hspy_gd = self.hspy_gd.remove_background(signal_range=(r1, r2), background_type=which)
+        return [self._get_data(self.hspy_gd.remove_background(signal_range=(r1, r2), show_progressbar=True,
+                                                              background_type=which)
+                               , 'remove_background_')]
 
     def plot_gaussian(self, range: tuple) -> list:
         r1 = self._rel_to_abs(range[0])
@@ -122,10 +129,10 @@ class HspySignal1D:
         m.append(gaussian)
         m[0].active = False
         m.assign_current_values_to_all()
-        m.multifit(bounded=False, show_progressbar=False)
+        m.multifit(bounded=False, show_progressbar=True)
         m[1].print_current_values()
 
-        return [self._get_data(m.as_signal(show_progressbar=False).isig[r1:r2], 'gaussian_fit_'),
+        return [self._get_data(m.as_signal(show_progressbar=True).isig[r1:r2], 'gaussian_fit_'),
                 self._get_data(gaussian.A.as_signal(), 'gaussian_fit_amplitude_'),
                 self._get_data(gaussian.centre.as_signal(), 'gaussian_fit_centre_'),
                 self._get_data(gaussian.sigma.as_signal(), 'gaussian_fit_sigma_')]
@@ -144,10 +151,10 @@ class HspySignal1D:
         m.append(lor)
         m[0].active = False
         m.assign_current_values_to_all()
-        m.multifit(bounded=False, show_progressbar=False)
+        m.multifit(bounded=False, show_progressbar=True)
         m[1].print_current_values()
 
-        return [self._get_data(m.as_signal(show_progressbar=False).isig[r1:r2], 'lorentzian_fit_')]
+        return [self._get_data(m.as_signal(show_progressbar=True).isig[r1:r2], 'lorentzian_fit_')]
 
     def signal_decomposition(self, range=[0, 1], components=3, mask=True) -> list:
 
@@ -166,9 +173,8 @@ class HspySignal1D:
         factors = hs.signals.Signal1D(self.hspy_gd.learning_results.factors[:, :components].reshape(self.signal_size, components).transpose())
         shape_loading = self.hspy_gd.axes_manager._navigation_shape_in_array
         loadings_stacked = hs.signals.Signal1D(
-            self.hspy_gd.learning_results.loadings[:, :components].reshape(shape_loading[0], shape_loading[1], components).transpose())
+            self.hspy_gd.learning_results.loadings[:, :components].reshape(shape_loading[0], shape_loading[1], components).transpose((2, 0, 1))) #2, 1, 0
 
-        #print(spim_dec.metadata.as_dictionary())
         def calibrate_axes(temp, input_index, output_index):
             temp.axes_manager[input_index].scale = self.hspy_gd.axes_manager[output_index].scale
             temp.axes_manager[input_index].offset = self.hspy_gd.axes_manager[output_index].offset
@@ -189,14 +195,14 @@ class HspySignal1D:
     def _rel_to_abs(self, val):
         return self.signal_calib.offset + val*self.signal_calib.scale*self.signal_size
 
-    def deconvolution(self, psf, type, interactions):
+    def deconvolution(self, psf, type, interactions) -> list:
         # if type=='Fourier log':
         #     self.hspy_gd.fourier_log_deconvolution(psf.hspy_gd)
         # elif type=='Fourier ratio':
         #     self.hspy_gd.fourier_ratio_deconvolution(psf.hspy_gd)
         if type=='Richardson lucy':
-            data = self.hspy_gd.richardson_lucy_deconvolution(psf.hspy_gd, interactions, show_progressbar=False)
-        return self._get_data(data, 'RLdec' + str(interactions) + '_')
+            data = self.hspy_gd.richardson_lucy_deconvolution(psf.hspy_gd, interactions, show_progressbar=True)
+        return [self._get_data(data, 'RLdec' + str(interactions) + '_')]
 
     def _pixel_filler_Datum1(self, pixel, corrected_data, raw_data):
         # Added by ltizei. This is used to complete missing pixels in the Medipix detector junctions. This will
@@ -250,7 +256,7 @@ class HspySignal1D:
 
         return self._get_data(corrected_data_hs, 'Corrected ')
 
-    def correct_gain_hs(self, ht, threshold, gain_roi):
+    def correct_gain_hs(self, ht, threshold, gain_roi) -> list:
         #This will need to change to a "setup" folder
         self.__gain_file = read_data_gain.FileManager(ht, threshold)
 
@@ -258,4 +264,4 @@ class HspySignal1D:
         vertical_bin =gain_roi[3] - gain_roi[1]
         gain_signal = self.__gain_file.gain.isig[gain_roi[0]:gain_roi[2], gain_roi[1]:gain_roi[3]].sum(axis=1)
 
-        self.hspy_gd = self.hspy_gd*gain_signal_mean*vertical_bin/(gain_signal)
+        return [self._get_data(self.hspy_gd*gain_signal_mean*vertical_bin/(gain_signal), 'correct_gain_')]
