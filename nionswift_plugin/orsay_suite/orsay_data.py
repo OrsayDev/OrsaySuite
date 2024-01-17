@@ -57,7 +57,7 @@ class HspySignal1D:
         self.hspy_gd.align_zero_loss_peak(subpixel=False, show_progressbar=True, signal_range=[r1, r2])
         return [self._get_data(self.hspy_gd, 'align_zlp_')]
 
-    def _get_data(self, temp_data, prefix, is_sequence = False, collection_dimension = None, datum_dimension = None) -> DataItem.DataItem:
+    def get_data_and_metadata(self, temp_data, is_sequence = False, collection_dimension = None, datum_dimension = None) -> DataAndMetadata:
         timezone = Utility.get_local_timezone()
         timezone_offset = Utility.TimezoneMinutesToStringConverter().convert(Utility.local_utcoffset_minutes())
         calibration = Calibration.Calibration()
@@ -78,13 +78,17 @@ class HspySignal1D:
                                                       data_descriptor=data_descriptor,
                                                       metadata=metadata,
                                                       timezone=timezone, timezone_offset=timezone_offset)
+
+        return xdata
+
+    def _get_data(self, temp_data, prefix, is_sequence = False, collection_dimension = None, datum_dimension = None) -> DataItem.DataItem:
+        xdata = self.get_data_and_metadata(temp_data, is_sequence, collection_dimension, datum_dimension)
+
         data_item = DataItem.DataItem()
         data_item.set_xdata(xdata)
         data_item.title = prefix + self.di.title
         data_item.description = self.di.description
         data_item.caption = self.di.caption
-
-        #logging.info(f'***HSPY***: The axes of the returned data is {temp_data.axes_manager}.')
 
         return data_item
 
