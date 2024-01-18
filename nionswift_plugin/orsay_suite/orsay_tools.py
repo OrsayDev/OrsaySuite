@@ -373,15 +373,20 @@ class handler:
             self.__drift.abort()
 
     def _update_cross_correlation(self):
-        self.__crossx_di.update_data_only(self.__drift.datax)
-        self.__crossy_di.update_data_only(self.__drift.datay)
-        if self.__fft_show: self.__cross_fft.update_data_only(self.__drift.cross_fft)
+        try:
+            self.__crossx_di.update_data_only(self.__drift.datax)
+            self.__crossy_di.update_data_only(self.__drift.datay)
+            if self.__fft_show: self.__cross_fft.update_data_only(self.__drift.cross_fft)
+        except AttributeError:
+            logging.debug("***Drift Correction***: Manual correction activated.")
         self.property_changed_event.fire("shifter_u")
         self.property_changed_event.fire("shifter_v")
 
     def start_manual_correction(self, widget):
         if widget.text == "Start":
-            if not self.__drift.start(self._update_cross_correlation, self.__drift.scan_systems[self.scan_selection_dd.current_index], self.time_interval_manual_value.text,
+            scan_index = self.scan_selection_dd.current_index
+            instrument_index = self.instrument_selection_dd.current_index
+            if not self.__drift.start(self._update_cross_correlation, scan_index, instrument_index, self.time_interval_manual_value.text,
                                self.static_reference_pb.checked, True, True, (self.manual_drift_x_value.text, self.manual_drift_y_value.text)):
                 self.note_manual_label.text = 'Status: Not running (activate scan channel)'
                 return
@@ -435,7 +440,6 @@ class View:
         ui = Declarative.DeclarativeUI()
 
         #General elements. Used often.
-        self.close_par = ui.create_label(text=')')
 
         #General Group
         self.fit_text = ui.create_label(text='Fitting: ', name='fit_text')
@@ -443,7 +447,6 @@ class View:
         self.fit_lorentzian_pb = ui.create_push_button(text='Lorentzian', name='fit_lorentzian_pb',
                                                      on_clicked='fit_lorentzian')
 
-        self.simple_text = ui.create_label(text='Simple corrections: ', name='simple_text')
         self.cj_pb = ui.create_push_button(text='Correct Junctions', name='cj_pb', on_clicked='correct_junctions')
         self.align_zlp_pb = ui.create_push_button(text='Align ZLP', name='align_zlp_pb', on_clicked='align_zlp')
         self.cgain_pb = ui.create_push_button(text='Correct Gain', name='cgain_pb',
@@ -456,20 +459,20 @@ class View:
         self.remove_background_pb = ui.create_push_button(text='Do it.', name='remove_background_pb',
                                                           on_clicked='remove_background')
 
-        self.binning_text = ui.create_label(text='Bin data (x, y, E): (', name='binning_text')
+        self.binning_text = ui.create_label(text='Bin data (x, y, E): ', name='binning_text')
         self.x_le = ui.create_line_edit(name='x_le', width=25)
         self.y_le = ui.create_line_edit(name='y_le', width=25)
         self.E_le = ui.create_line_edit(name='E_le', width=25)
         self.bin_pb = ui.create_push_button(text='Bin', name='bin_pb', on_clicked='hspy_bin')
 
-        self.pb_row = ui.create_row(self.simple_text, self.cj_pb, self.align_zlp_pb, self.cgain_pb,
+        self.pb_row = ui.create_row(self.cj_pb, self.align_zlp_pb, self.cgain_pb,
                                     self.flip_pb, ui.create_stretch())
         self.pb_remove = ui.create_row(self.background_text, self.remove_background_combo, self.remove_background_pb,
                                        ui.create_stretch())
         self.pb_row_fitting = ui.create_row(self.fit_text, self.fit_gaussian_pb, self.fit_lorentzian_pb,
                                             ui.create_stretch())
         self.binning_row = ui.create_row(self.binning_text, self.x_le, self.y_le,
-                                         self.E_le, self.close_par, ui.create_spacing(5), self.bin_pb,
+                                         self.E_le, ui.create_spacing(5), self.bin_pb,
                                          ui.create_stretch())
 
         self.general_group = ui.create_group(title='General Tools', content=ui.create_column(
@@ -477,18 +480,18 @@ class View:
 
 
         #Hyperspectral group
-        self.deconvolution_text = ui.create_label(text='Signal deconvolution (interactions): (', name='deconvolution_text')
+        self.deconvolution_text = ui.create_label(text='Deconvolution (interactions): ', name='deconvolution_text')
         self.int_le = ui.create_line_edit(name='int_le', width=20)
         self.dec_rl_pb = ui.create_push_button(text='Richardson-Lucy', name='dec_rl_pb',
                                             on_clicked='deconvolve_rl_hspec')
-        self.pb_row = ui.create_row(self.deconvolution_text, self.int_le, self.close_par, ui.create_spacing(5),
+        self.pb_row = ui.create_row(self.deconvolution_text, self.int_le, ui.create_spacing(5),
                                     self.dec_rl_pb, ui.create_stretch())
 
-        self.dec_text = ui.create_label(text='Signal decomposition (components): (', name='dec_text')
+        self.dec_text = ui.create_label(text='SVD Decomposition (components): ', name='dec_text')
         self.comp_le = ui.create_line_edit(name='comp_le', width=20)
-        self.pca_pb = ui.create_push_button(text='Masked SVD', name='pca3_pb', on_clicked='pca_mask')
-        self.pca2_pb = ui.create_push_button(text='Full SVD', name='pca3_pb', on_clicked='pca')
-        self.decomposition_row = ui.create_row(self.dec_text, self.comp_le, self.close_par, ui.create_spacing(5),
+        self.pca_pb = ui.create_push_button(text='Masked', name='pca3_pb', on_clicked='pca_mask', width=55)
+        self.pca2_pb = ui.create_push_button(text='Full', name='pca3_pb', on_clicked='pca', width=55)
+        self.decomposition_row = ui.create_row(self.dec_text, self.comp_le, ui.create_spacing(5),
                                                self.pca_pb, self.pca2_pb,
                                                ui.create_stretch())
 

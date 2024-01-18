@@ -1,5 +1,4 @@
 import inspect
-
 import numpy
 from nion.data import Calibration
 from nion.swift.model import DataItem
@@ -33,7 +32,7 @@ class HspySignal1D:
             self.hspy_gd.axes_manager[index].units = di.dimensional_calibrations[index].units
 
     #Methods that modify the hyperspy object
-    def flip(self) -> list:
+    def flip(self) -> list[DataItem.DataItem]:
         signal_axis = len(self.hspy_gd.data.shape)-1
         self.hspy_gd.data = numpy.flip(self.hspy_gd.data, axis=signal_axis)
         return [self._get_data(self.hspy_gd, 'flip_')]
@@ -43,7 +42,7 @@ class HspySignal1D:
     #     self.hspy_gd.interpolate_in_between(256*2 - 1, 256*2 + 1, show_progressbar=False)
     #     self.hspy_gd.interpolate_in_between(256*3 - 1, 256*3 + 1, show_progressbar=False)
 
-    def rebin(self, scale) -> list:
+    def rebin(self, scale) -> list[DataItem.DataItem]:
         if self.nav_len == 0:
             return [self._get_data(self.hspy_gd.rebin(scale=[scale[2]]), 'align_zlp_')]
         elif self.nav_len == 1:
@@ -51,7 +50,7 @@ class HspySignal1D:
         elif self.nav_len == 2:
             return [self._get_data(self.hspy_gd.rebin(scale=scale), 'align_zlp_')]
 
-    def align_zlp_signal_range(self, range) -> list:
+    def align_zlp_signal_range(self, range: tuple) -> list[DataItem.DataItem]:
         r1 = self._rel_to_abs(range[0])
         r2 = self._rel_to_abs(range[1])
         self.hspy_gd.align_zero_loss_peak(subpixel=False, show_progressbar=True, signal_range=[r1, r2])
@@ -92,34 +91,13 @@ class HspySignal1D:
 
         return data_item
 
-    # def get_di(self, inav=None, isig=None, sum_inav=None, sum_isig=None):
-    #     temp_data = self.hspy_gd
-    #     nav_len = len(temp_data.data.shape)-1
-    #     if inav is not None:
-    #         assert nav_len == len(inav)
-    #         if nav_len == 0:
-    #             pass
-    #         elif nav_len == 1:
-    #             temp_data = temp_data.inav[inav[0]: inav[1]]
-    #         elif nav_len == 2:
-    #             temp_data = temp_data.inav[inav[0][0]: inav[0][1], inav[1][0]: inav[1][1]]
-    #     if isig is not None:
-    #         temp_data = temp_data.isig[isig[0]: isig[1]]
-    #     if sum_inav:
-    #         temp_data = temp_data.sum(axis=0)
-    #     if sum_isig:
-    #         temp_data = temp_data.sum(axis=1)
-    #
-    #     return self._get_data(temp_data, 'processed_')
-
-    def remove_background(self, range, which) -> list:
+    def remove_background(self, range: tuple, which: str) -> list[DataItem.DataItem]:
         r1 = self._rel_to_abs(range[0])
         r2 = self._rel_to_abs(range[1])
         return [self._get_data(self.hspy_gd.remove_background(signal_range=(r1, r2), show_progressbar=True,
-                                                              background_type=which)
-                               , 'remove_background_')]
+                                                              background_type=which), 'remove_background_')]
 
-    def plot_gaussian(self, range: tuple) -> list:
+    def plot_gaussian(self, range: tuple) -> list[DataItem.DataItem]:
         r1 = self._rel_to_abs(range[0])
         r2 = self._rel_to_abs(range[1])
 
@@ -136,12 +114,19 @@ class HspySignal1D:
         m.multifit(bounded=False, show_progressbar=True)
         m[1].print_current_values()
 
-        return [self._get_data(m.as_signal(show_progressbar=True).isig[r1:r2], 'gaussian_fit_'),
-                self._get_data(gaussian.A.as_signal(), 'gaussian_fit_amplitude_'),
-                self._get_data(gaussian.centre.as_signal(), 'gaussian_fit_centre_'),
-                self._get_data(gaussian.sigma.as_signal(), 'gaussian_fit_sigma_')]
+        return_list = list()
+        signals = [m.as_signal(show_progressbar=False).isig[r1:r2], gaussian.A.as_signal(), gaussian.centre.as_signal(),
+                   gaussian.sigma.as_signal()]
+        labels = ['gaussian_fit_', 'gaussian_fit_amplitude_', 'gaussian_fit_centre_', 'gaussian_fit_sigma_']
+        for (sig, lab) in zip(signals, labels):
+            try:
+                return_list.append(self._get_data(sig, lab))
+            except IndexError:
+                print("Uni-dimensional item is not plotted.")
 
-    def plot_lorentzian(self, range: tuple) -> list:
+        return return_list
+
+    def plot_lorentzian(self, range: tuple) -> list[DataItem.DataItem]:
         r1 = self._rel_to_abs(range[0])
         r2 = self._rel_to_abs(range[1])
 
@@ -158,9 +143,19 @@ class HspySignal1D:
         m.multifit(bounded=False, show_progressbar=True)
         m[1].print_current_values()
 
-        return [self._get_data(m.as_signal(show_progressbar=True).isig[r1:r2], 'lorentzian_fit_')]
+        return_list = list()
+        signals = [m.as_signal(show_progressbar=False).isig[r1:r2], lor.A.as_signal(),
+                   lor.centre.as_signal(), lor.gamma.as_signal()]
+        labels = ['lorentzian_fit_', 'lorentzian_fit_amplitude_', 'lorentzian_fit_centre_', 'lorentzian_fit_gamma_']
+        for (sig, lab) in zip(signals, labels):
+            try:
+                return_list.append(self._get_data(sig, lab))
+            except IndexError:
+                print("Uni-dimensional item is not plotted.")
 
-    def signal_decomposition(self, range=[0, 1], components=3, mask=True) -> list:
+        return return_list
+
+    def signal_decomposition(self, range=[0, 1], components=3, mask=True) -> list[DataItem.DataItem]:
 
         if mask:
             r1 = self._rel_to_abs(range[0])
@@ -199,11 +194,7 @@ class HspySignal1D:
     def _rel_to_abs(self, val):
         return self.signal_calib.offset + val*self.signal_calib.scale*self.signal_size
 
-    def deconvolution(self, psf, type, interactions) -> list:
-        # if type=='Fourier log':
-        #     self.hspy_gd.fourier_log_deconvolution(psf.hspy_gd)
-        # elif type=='Fourier ratio':
-        #     self.hspy_gd.fourier_ratio_deconvolution(psf.hspy_gd)
+    def deconvolution(self, psf: 'HspySignal1D', type: str, interactions: int) -> list[DataItem.DataItem]:
         if type=='Richardson lucy':
             data = self.hspy_gd.richardson_lucy_deconvolution(psf.hspy_gd, interactions, show_progressbar=True)
         return [self._get_data(data, 'RLdec' + str(interactions) + '_')]

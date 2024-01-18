@@ -58,7 +58,7 @@ class DriftCorrection:
         if not manual_correction:
             self.__thread = threading.Thread(target=self.thread_func, args=(callback,))
         else:
-            self.__thread = threading.Thread(target=self.thread_manual_func, args=(manual_correction_values,))
+            self.__thread = threading.Thread(target=self.thread_manual_func, args=(callback, manual_correction_values,))
         self.__thread.start()
         return True
 
@@ -88,7 +88,7 @@ class DriftCorrection:
     def check_and_wait(self):
         time.sleep(self.__interval)
 
-    def thread_manual_func(self, manual_correction_values):
+    def thread_manual_func(self, callback, manual_correction_values):
         x_val, y_val = manual_correction_values
         x_val, y_val = float(x_val), float(y_val)
         time_correction = 0
@@ -97,6 +97,7 @@ class DriftCorrection:
             self.check_and_wait()
             self.displace_shifter_relative(0, x_val * self.__interval + time_correction)
             self.displace_shifter_relative(1, y_val * self.__interval + time_correction)
+            callback()
             end = time.time()
             time_correction = end - start - self.__interval
 
