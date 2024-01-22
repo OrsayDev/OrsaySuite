@@ -18,7 +18,7 @@ def get_source_code(func):
 class HspySignal1D:
     def __init__(self, di):
         self.di = di
-        new_data = numpy.copy(di.data)
+        new_data = numpy.copy(di.data.astype('float32'))
         self.hspy_gd = hs.signals.Signal1D(new_data)
         self.hspy_gd.set_signal_type("EELS")
 
